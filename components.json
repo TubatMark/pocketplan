@@ -1,0 +1,22 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "tailwind.config.ts",
+    "css": "app/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@/convex/components",
+    "utils": "@/convex/lib/utils",
+    "ui": "@/convex/components/ui",
+    "lib": "@/convex/lib",
+    "hooks": "@/convex/hooks"
+  },
+  "registries": {}
+}
