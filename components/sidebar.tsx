@@ -14,7 +14,8 @@ import {
   CreditCard,
   Database,
   List,
-  MessageSquare
+  MessageSquare,
+  UserCircle
 } from "lucide-react";
 
 const mainMenu = [
@@ -31,6 +32,7 @@ const accountMenu = [
   { href: "/wallets", label: "My Wallets", icon: Wallet },
   { href: "/messages", label: "Messages", icon: MessageSquare },
   { href: "/settings", label: "Setting", icon: Settings },
+  { href: "/about-developer", label: "About Dev", icon: UserCircle },
 ];
 
 export function Sidebar({ mobile }: { mobile?: boolean }) {

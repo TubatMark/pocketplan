@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Send, Clock, User, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
+import { DashboardShell } from "@/components/dashboard-shell";
 
 export default function UserMessagesPage() {
   const userKey = useUserKey();
@@ -52,11 +53,12 @@ export default function UserMessagesPage() {
   };
 
   return (
-    <div className="space-y-8 p-8 pt-0">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Messages</h2>
-        <p className="text-muted-foreground">Contact support or administrators.</p>
-      </div>
+    <DashboardShell>
+      <div className="space-y-8">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Messages</h2>
+          <p className="text-muted-foreground">Contact support or administrators.</p>
+        </div>
 
       <div className="grid gap-8 md:grid-cols-2">
         {/* Compose Message */}
@@ -149,6 +151,7 @@ export default function UserMessagesPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+      </div>
+    </DashboardShell>
   );
 }
