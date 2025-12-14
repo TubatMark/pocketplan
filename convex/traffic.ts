@@ -153,12 +153,12 @@ export const getSources = query({
 
 export const getLogs = query({
   args: {
-    limit: v.optional(v.number()),
+    paginationOpts: v.any(),
   },
   handler: async (ctx, args) => {
     return await ctx.db.query("traffic_logs")
       .withIndex("by_timestamp")
       .order("desc")
-      .take(args.limit || 50);
+      .paginate(args.paginationOpts);
   },
 });

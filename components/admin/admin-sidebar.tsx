@@ -27,7 +27,7 @@ export function AdminSidebar() {
   const pathname = usePathname();
 
   return (
-    <div className="flex h-screen w-64 flex-col border-r bg-gray-900 text-white">
+    <div className="sticky top-0 h-screen w-64 flex-col border-r bg-gray-900 text-white hidden md:flex shrink-0">
       <div className="flex h-16 items-center border-b border-gray-800 px-6">
         <Link href="/admin/dashboard" className="flex items-center gap-2 font-bold text-lg">
           <span className="text-blue-500">Pocket</span>Admin

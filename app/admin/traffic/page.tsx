@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "convex/react";
+import { useQuery, usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Download, RefreshCw, Eye, Users, Clock, MousePointerClick } from "lucide-react";
+import { Download, RefreshCw, Eye, Users, Clock, MousePointerClick, ChevronLeft, ChevronRight } from "lucide-react";
 import { TrafficLineChart, TrafficBarChart, TrafficPieChart } from "@/components/admin/traffic-charts";
 import { TrafficTable } from "@/components/admin/traffic-table";
 import { MetricCard } from "@/components/metric-card";
@@ -25,7 +25,42 @@ export default function TrafficAnalyticsPage() {
   const trends = useQuery(api.traffic.getTrends, { from, to, interval: parseInt(range) <= 7 ? "daily" : "daily" }); // Always daily for now unless range is huge
   const pages = useQuery(api.traffic.getPages, { from, to });
   const sources = useQuery(api.traffic.getSources, { from, to });
-  const logs = useQuery(api.traffic.getLogs, { limit: 50 });
+  
+  // Pagination
+  const { results: logs, status, loadMore, isLoading } = usePaginatedQuery(
+    api.traffic.getLogs,
+    {},
+    { initialNumItems: 10 }
+  );
+  
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // We are implementing client-side pagination on top of the incrementally loaded data
+  // "Next" will trigger `loadMore` if we need more data
+  
+  const totalLoaded = logs.length;
+  const maxPageLoaded = Math.ceil(totalLoaded / itemsPerPage);
+  
+  const handleNextPage = () => {
+    const nextPage = currentPage + 1;
+    if (nextPage > maxPageLoaded && status === "CanLoadMore") {
+      loadMore(itemsPerPage);
+      // We can't immediately switch page because data isn't here yet.
+      // But Convex usePaginatedQuery updates `results` reactively.
+      // So we can set page, and if data is missing, we show loading?
+      // Better: loadMore returns a promise? No.
+      // We'll optimistically increment, and if logs[index] is undefined, we wait.
+    }
+    setCurrentPage(nextPage);
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  };
+
+  // Slice logs for current page
+  const currentLogs = logs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   // Handle Export
   const handleExport = () => {
@@ -119,11 +154,37 @@ export default function TrafficAnalyticsPage() {
         </div>
         <div className="col-span-4">
           <Card className="h-full">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Recent Activity</CardTitle>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePrevPage}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm text-muted-foreground min-w-[3rem] text-center">
+                  Page {currentPage}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNextPage}
+                  disabled={status === "Exhausted" && currentPage >= maxPageLoaded}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <TrafficTable logs={logs || []} />
+              <TrafficTable 
+                logs={currentLogs || []} 
+                status={status}
+                loadMore={loadMore}
+                isLoading={isLoading}
+              />
             </CardContent>
           </Card>
         </div>
