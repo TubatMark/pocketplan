@@ -7,7 +7,8 @@ import { Progress } from "@/components/ui/progress";
 import { useState, useEffect } from "react";
 import { slugify } from "@/lib/utils";
 import Link from "next/link";
-import { FileText } from "lucide-react";
+import { FileText, History } from "lucide-react";
+import { useData } from "@/hooks/use-data";
 
 interface GoalDetailsDialogProps {
   goal: any;
@@ -16,13 +17,20 @@ interface GoalDetailsDialogProps {
   onClose: () => void;
   onUpdate: (goalId: string, updates: any) => Promise<void>;
   onDelete: (goalId: string) => Promise<void>;
+  userKey: string;
 }
 
-export function GoalDetailsDialog({ goal, progressData, isOpen, onClose, onUpdate, onDelete }: GoalDetailsDialogProps) {
+export function GoalDetailsDialog({ goal, progressData, isOpen, onClose, onUpdate, onDelete, userKey }: GoalDetailsDialogProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState("");
   const [amount, setAmount] = useState(0);
   const [months, setMonths] = useState(1);
+
+  // Fetch transactions for this goal
+  const { data: transactions, isLoading: isTransactionsLoading } = useData<any[]>("transactions:listByGoal" as any, { 
+    userKey, 
+    goalId: goal?._id 
+  } as any);
 
   useEffect(() => {
     if (goal) {
@@ -52,7 +60,7 @@ export function GoalDetailsDialog({ goal, progressData, isOpen, onClose, onUpdat
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Goal" : "Goal Details"}</DialogTitle>
         </DialogHeader>
@@ -114,6 +122,47 @@ export function GoalDetailsDialog({ goal, progressData, isOpen, onClose, onUpdat
                 <span className="font-medium">₱{goal.required_daily_savings.toFixed(2)}</span>
               </div>
             </div>
+
+             {/* Savings History */}
+             <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <History className="h-4 w-4 text-gray-500" />
+                  <h4 className="font-medium text-sm text-gray-900">Savings History</h4>
+                </div>
+                
+                <div className="rounded-md border bg-white">
+                  {isTransactionsLoading ? (
+                    <div className="p-4 text-center text-sm text-gray-500">Loading history...</div>
+                  ) : transactions && transactions.length > 0 ? (
+                    <div className="max-h-[200px] overflow-y-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 text-xs font-medium text-gray-500 sticky top-0">
+                          <tr>
+                            <th className="px-3 py-2 text-left">Date</th>
+                            <th className="px-3 py-2 text-left">Type</th>
+                            <th className="px-3 py-2 text-left">Source</th>
+                            <th className="px-3 py-2 text-right">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {transactions.map((t: any) => (
+                            <tr key={t._id}>
+                              <td className="px-3 py-2 text-gray-600">{new Date(t.created_at).toLocaleDateString()}</td>
+                              <td className="px-3 py-2 capitalize text-gray-600">{t.type}</td>
+                              <td className="px-3 py-2 text-gray-600 truncate max-w-[100px]" title={t.walletName}>{t.walletName}</td>
+                              <td className={`px-3 py-2 text-right font-medium ${t.type === 'expense' ? 'text-red-600' : 'text-green-600'}`}>
+                                {t.type === 'expense' ? '-' : '+'}₱{t.amount.toLocaleString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="p-4 text-center text-sm text-gray-500">No savings transactions found.</div>
+                  )}
+                </div>
+             </div>
 
             {/* AI Plan Link */}
             <div className="rounded-lg bg-indigo-50 p-4 flex items-center justify-between">

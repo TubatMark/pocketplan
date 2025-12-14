@@ -231,8 +231,8 @@ export const dashboard = query({
       const goalTransactions = txs.filter((t: any) => t.goal_id === g._id);
       
       const saved = goalTransactions.reduce((acc: number, t: any) => {
-         // Income/Transfer IN adds to goal
-         if (t.type === 'income' || (t.type === 'transfer' && t.transfer_to_wallet_id)) return acc + t.amount;
+         // Income/Transfer IN/Savings adds to goal
+         if (t.type === 'income' || t.type === 'savings' || (t.type === 'transfer' && t.transfer_to_wallet_id)) return acc + t.amount;
          // Expense/Transfer OUT subtracts (if users withdraw from goal)
          if (t.type === 'expense' || (t.type === 'transfer' && t.transfer_from_wallet_id)) return acc - t.amount;
          return acc;

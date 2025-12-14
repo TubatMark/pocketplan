@@ -6,7 +6,7 @@ export const log = mutation({
   args: {
     userKey: v.string(),
     amount: v.number(),
-    type: v.union(v.literal("income"), v.literal("expense"), v.literal("transfer")),
+    type: v.union(v.literal("income"), v.literal("expense"), v.literal("transfer"), v.literal("savings"), v.literal("debt_payment")),
     category: v.string(),
     wallet_id: v.optional(v.id("wallets")),
     transfer_from_wallet_id: v.optional(v.id("wallets")),
@@ -82,7 +82,7 @@ export const log = mutation({
     await ctx.db.insert("activities", {
       user_id: user._id,
       type: args.type,
-      description: `${args.type === "income" ? "Income" : "Expense"}: ${args.category} (${wallet.name})`,
+      description: `${args.type.charAt(0).toUpperCase() + args.type.slice(1).replace('_', ' ')}: ${args.category} (${wallet.name})`,
       amount: args.amount,
       related_id: wallet._id,
       created_at: now,
@@ -101,17 +101,34 @@ export const list = query({
   },
 });
 
-export const monthlyTotals = query({
-  args: { userKey: v.string(), month: v.number(), year: v.number() },
+export const listByGoal = query({
+  args: { userKey: v.string(), goalId: v.id("goals") },
   handler: async (ctx: any, args: any) => {
     const user = await getUserFromToken(ctx, args.userKey);
-    if (!user) return { income: 0, expense: 0, net: 0 };
-    const start = new Date(args.year, args.month, 1).getTime();
-    const end = new Date(args.year, args.month + 1, 0, 23, 59, 59, 999).getTime();
-    const txs = await ctx.db.query("transactions").withIndex("by_user_created", (ix: any) => ix.eq("user_id", user._id)).collect();
-    const range = txs.filter((t: any) => t.created_at >= start && t.created_at <= end);
-    const income = range.filter((t: any) => t.type === "income").reduce((a: number, b: any) => a + b.amount, 0);
-    const expense = range.filter((t: any) => t.type === "expense").reduce((a: number, b: any) => a + b.amount, 0);
-    return { income, expense, net: income - expense };
+    if (!user) return [];
+    
+    const transactions = await ctx.db
+      .query("transactions")
+      .withIndex("by_user", (q: any) => q.eq("user_id", user._id))
+      .filter((q: any) => q.eq(q.field("goal_id"), args.goalId))
+      .collect();
+
+    // Sort by created_at descending
+    const sorted = transactions.sort((a: any, b: any) => b.created_at - a.created_at);
+
+    // Enrich with wallet names
+    const enriched = await Promise.all(sorted.map(async (t: any) => {
+      let walletName = "Unknown Wallet";
+      if (t.wallet_id) {
+        const w = await ctx.db.get(t.wallet_id);
+        if (w) walletName = w.name;
+      } else if (t.transfer_from_wallet_id) {
+        const w = await ctx.db.get(t.transfer_from_wallet_id);
+        if (w) walletName = w.name;
+      }
+      return { ...t, walletName };
+    }));
+
+    return enriched;
   },
 });

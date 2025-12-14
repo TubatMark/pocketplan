@@ -167,6 +167,7 @@ function GoalContent() {
           onDelete={async (goalId) => {
             await removeGoal({ userKey, goalId: goalId as any });
           }}
+          userKey={userKey}
         />
       </div>
     </DashboardShell>
