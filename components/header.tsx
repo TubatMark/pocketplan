@@ -23,7 +23,6 @@ export function Header() {
           <div className="hidden md:block text-right">
             <p className="text-sm font-semibold leading-none">{me?.name ?? "Guest User"}</p>
           </div>
-          <ChevronDown className="h-4 w-4 text-gray-400" />
         </div>
       </div>
     </header>
