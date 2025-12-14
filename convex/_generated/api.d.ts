@@ -19,6 +19,7 @@ import type * as debts from "../debts.js";
 import type * as goals from "../goals.js";
 import type * as plans from "../plans.js";
 import type * as security from "../security.js";
+import type * as traffic from "../traffic.js";
 import type * as transactions from "../transactions.js";
 import type * as users from "../users.js";
 import type * as wallets from "../wallets.js";
@@ -41,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   goals: typeof goals;
   plans: typeof plans;
   security: typeof security;
+  traffic: typeof traffic;
   transactions: typeof transactions;
   users: typeof users;
   wallets: typeof wallets;

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, Settings, LogOut, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const sidebarItems = [
@@ -10,6 +10,11 @@ const sidebarItems = [
     title: "Dashboard",
     href: "/admin/dashboard",
     icon: LayoutDashboard,
+  },
+  {
+    title: "Traffic Analytics",
+    href: "/admin/traffic",
+    icon: BarChart3,
   },
   {
     title: "User Management",

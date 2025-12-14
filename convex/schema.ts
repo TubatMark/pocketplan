@@ -106,6 +106,20 @@ export default defineSchema({
     notes: v.optional(v.string()),
   }).index("by_debt", ["debt_id"]),
 
+  traffic_logs: defineTable({
+    path: v.string(),
+    visitor_id: v.string(), // Persistent client ID
+    session_id: v.string(), // Ephemeral session ID
+    ip_hash: v.optional(v.string()),
+    user_agent: v.optional(v.string()),
+    country: v.optional(v.string()),
+    city: v.optional(v.string()),
+    referrer: v.optional(v.string()),
+    device_type: v.optional(v.string()),
+    browser: v.optional(v.string()),
+    timestamp: v.number(),
+  }).index("by_timestamp", ["timestamp"]).index("by_session", ["session_id"]),
+
   settings: defineTable({
     key: v.string(),
     value: v.any(),

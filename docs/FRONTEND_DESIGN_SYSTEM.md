@@ -1,117 +1,140 @@
-# PocketPlan UI & Frontend Design System
+# Frontend Design System
 
-This document describes the frontend architecture, design system, and UI patterns used in PocketPlan. It serves as a reference for maintaining consistency across the application and for future projects.
+This document serves as the single source of truth for the PocketPlan frontend design system. It outlines the technology stack, core design tokens, layout patterns, and component library usage to ensure consistency across the application.
 
-## 1. Tech Stack
+## 1. Tech Stack Overview
 
-*   **Framework**: [Next.js](https://nextjs.org/) (App Router)
-*   **Language**: TypeScript
-*   **Styling**: [Tailwind CSS](https://tailwindcss.com/)
-*   **Component Primitives**: [Radix UI](https://www.radix-ui.com/) (Headless, accessible components)
-*   **Icons**: [Lucide React](https://lucide.dev/)
-*   **Fonts**: [Outfit](https://fonts.google.com/specimen/Outfit) (via `next/font/google`)
-*   **State Management**: React Hooks + [Convex](https://convex.dev/) (Real-time database & backend)
-*   **Utility**: `clsx` and `tailwind-merge` (via `cn` helper) for dynamic class composition.
+- **Framework**: [Next.js](https://nextjs.org/) (App Router)
+- **Language**: [TypeScript](https://www.typescriptlang.org/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+- **Component Primitives**: [Radix UI](https://www.radix-ui.com/) (Headless, accessible components)
+- **Icons**: Lucide React
+- **Utilities**:
+  - `clsx` & `tailwind-merge` (via `cn` helper) for dynamic class composition.
+  - `class-variance-authority` (CVA) for managing component variants.
 
-## 2. Design Tokens & Theme
+## 2. Typography
 
-The project uses CSS variables for theming, enabling easy customization and dark mode support.
+The application uses the **Outfit** font family from Google Fonts.
 
-### Colors
-Defined in `globals.css` and `tailwind.config.ts`.
+- **Font Family**: `Outfit`
+- **Variable**: `--font-sans`
+- **Implementation**: Applied globally to the `body` in `app/layout.tsx`.
+- **Tracking**: Custom tracking variable `--tracking-normal` is applied.
 
-*   **Primary**: Brand color (Indigo/Blue tones). Used for primary buttons, active states, and highlights.
-    *   `bg-primary`, `text-primary-foreground`
-*   **Secondary**: Muted accent color.
-    *   `bg-secondary`, `text-secondary-foreground`
-*   **Destructive**: Error/Danger actions (Red).
-    *   `bg-destructive`, `text-destructive-foreground`
-*   **Muted**: Subtle backgrounds and de-emphasized text.
-    *   `bg-muted`, `text-muted-foreground`
-*   **Background/Foreground**: Base page background and text color.
-    *   `bg-background`, `text-foreground`
-*   **Card/Popover**: Surface colors for containers.
-    *   `bg-card`, `text-card-foreground`
-*   **Border/Input/Ring**: Functional colors for form elements and dividers.
+## 3. Color System (Design Tokens)
 
-### Typography
-*   **Font Family**: `Outfit` (Sans-serif).
-*   **Scale**: Standard Tailwind scale.
-    *   Headings: `text-3xl font-bold tracking-tight`
-    *   Subheadings: `text-lg font-semibold`
-    *   Body: `text-base` or `text-sm`
-    *   Muted Text: `text-sm text-muted-foreground`
+The color system is built on CSS variables to support theming (Light/Dark mode). All colors are defined in `app/globals.css` and referenced in `tailwind.config.ts`.
 
-### Spacing & Layout
-*   **Container**: `max-w-7xl` centered for main content.
-*   **Padding**: Consistent usage of `p-4` (mobile) and `p-8` (desktop).
-*   **Radius**: `rounded-lg` (0.5rem) for cards and inputs, `rounded-md` for buttons.
+### Base Colors
+| Token | Description | Tailwind Class |
+|-------|-------------|----------------|
+| `--background` | Main page background | `bg-background` |
+| `--foreground` | Main text color | `text-foreground` |
+| `--muted` | Muted backgrounds (e.g., secondary buttons) | `bg-muted` |
+| `--muted-foreground` | Muted text (e.g., subtitles) | `text-muted-foreground` |
 
-## 3. Core Components
+### Semantic Colors
+| Token | Description | Tailwind Class |
+|-------|-------------|----------------|
+| `--primary` | Primary actions (Deep Teal in Light mode) | `bg-primary` |
+| `--destructive` | Error states or destructive actions | `bg-destructive` |
+| `--border` | Default border color | `border-border` |
+| `--input` | Input field borders | `border-input` |
+| `--ring` | Focus ring color | `ring-ring` |
 
-Reusables located in `components/ui/`.
+### Dashboard Specific Colors (Pastels)
+Custom pastel colors used for Metric Cards and Dashboard elements:
+- **Orange**: `hsl(var(--card-orange))` (25 100% 92%)
+- **Green**: `hsl(var(--card-green))` (140 60% 92%)
+- **Purple**: `hsl(var(--card-purple))` (250 60% 96%)
+- **Blue**: `hsl(var(--card-blue))` (210 80% 94%)
 
-### Layout Components
-*   **DashboardShell**: Wraps the main authenticated view.
-    *   **Sidebar**: Fixed vertical nav (`md:pl-64`), hidden on mobile.
-    *   **Header**: Sticky top bar.
-    *   **MobileBottomNav**: Fixed bottom bar for mobile navigation.
-*   **Card**: Container for grouping related content.
-    *   Composition: `Card` → `CardHeader` (Title/Description) → `CardContent` → `CardFooter`.
+### Chart Colors
+- **Background**: `hsl(var(--chart-bg))` (Dark Green)
+- **Bars**: `hsl(var(--chart-bar))` (Yellowish)
 
-### Interactive Elements
-*   **Button**:
-    *   Variants: `default`, `secondary`, `destructive`, `outline`, `ghost`.
-    *   Sizes: `sm`, `md` (default), `lg`.
-    *   States: `hover:opacity-90`, `disabled:opacity-50`.
-*   **Switch**: Toggle for boolean settings.
-    *   States: Checked (Primary), Unchecked (Input color), Disabled.
-*   **Input / Select**: Standard form fields with `ring` focus states.
+## 4. Layout Patterns
 
-### Feedback & Overlays
-*   **Dialog (Modal)**: Accessible modal for complex interactions.
-    *   Features: Backdrop blur, centered content, accessible focus management.
-*   **Toast**: Non-intrusive notifications (Success/Error).
-    *   Contextual styling (Green for success, Red for error).
-*   **Skeleton**: Pulse animation for loading states.
-    *   Used to prevent layout shifts during data fetching.
+### Dashboard Layout
+The dashboard typically consists of a grid of cards and charts.
 
-## 4. UI Patterns & UX
+- **Metric Cards** (`components/ui/metric-card.tsx`):
+  - **Structure**:
+    - **Header**: Label (left) + Icon (right, rounded background).
+    - **Body**: Large Value + Subtext.
+  - **Styling**: Uses custom pastel background colors via the `colorVar` prop.
+  - **Interactivity**: Optional `onClick` handler with hover shadow effects.
 
-### Optimistic UI
-*   **Immediate Feedback**: UI updates immediately upon user interaction (e.g., toggling a switch) while the backend request processes.
-*   **Loading States**:
-    *   **Specific**: `toggling` state per item prevents interaction blocking.
-    *   **Visuals**: `opacity-50`, `cursor-wait`, and spinners (`Loader2` animate-spin).
+### Table Layout
+Tables are built using the `components/ui/table.tsx` component, which wraps standard HTML table elements with accessible and styled components.
 
-### Responsive Design
-*   **Mobile-First**: Layouts adapt from single column (`grid-cols-1`) to multi-column (`md:grid-cols-2`).
-*   **Navigation**: Sidebar on desktop vs. Bottom Nav on mobile ensures accessibility on all devices.
+- **Wrapper**: `<div className="relative w-full overflow-auto">` ensures tables are responsive.
+- **Components**:
+  - `Table`: Main container, full width.
+  - `TableHeader`: Sticky top header container.
+  - `TableRow`: Includes hover states (`hover:bg-muted/50`) and selection states.
+  - `TableHead`: Muted text, medium font weight.
+  - `TableCell`: Standard padding and alignment.
+
+**Example Usage**:
+```tsx
+<Table>
+  <TableHeader>
+    <TableRow>
+      <TableHead>Status</TableHead>
+      <TableHead>Amount</TableHead>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell><Badge>Active</Badge></TableCell>
+      <TableCell>$250.00</TableCell>
+    </TableRow>
+  </TableBody>
+</Table>
+```
+
+## 5. Component Library
+
+All reusable components are located in `components/ui/`. They are built with accessibility (a11y) in mind, often leveraging Radix UI primitives.
+
+### Primitives
+- **Button** (`button.tsx`): Supports variants (`default`, `destructive`, `outline`, `secondary`, `ghost`, `link`) and sizes (`default`, `sm`, `lg`, `icon`).
+- **Input** (`input.tsx`): Standard text input with focus rings.
+- **Select** (`select.tsx`): Accessible dropdown menu.
+- **Switch** (`switch.tsx`): Toggle switch for boolean states.
+- **Label** (`label.tsx`): Accessible label for form inputs.
+- **Textarea** (`textarea.tsx`): Multi-line text input.
+
+### Feedback & Status
+- **Badge** (`badge.tsx`): Small status indicators. Variants: `default`, `secondary`, `destructive`, `outline`.
+- **Alert** (`alert.tsx`): For displaying important messages (error, warning, info).
+- **Progress** (`progress.tsx`): Visual progress bar.
+- **Skeleton** (`skeleton.tsx`): Loading placeholder states.
+- **Tooltip** (`tooltip.tsx`): Hover information popups.
+
+### Overlays
+- **Dialog** (`dialog.tsx`): Modal windows for critical interactions.
+- **Sheet** (`sheet.tsx`): Slide-out panels (Top, Bottom, Left, Right). Commonly used for mobile navigation or detailed editing views.
 
 ### Data Display
-*   **Empty States**: Clear messaging when no data is available.
-*   **Loading Skeletons**: Mirrors the actual content shape (Circle for icons, Bars for text) rather than generic spinners.
+- **Card** (`card.tsx`): Versatile container with `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, and `CardFooter`.
+- **Avatar** (`avatar.tsx`): User profile images with fallback initials.
 
-## 5. File Structure Reference
+### Utilities
+- **DatePicker** (`datepicker.tsx`): Calendar selection input.
+- **Tabs** (`tabs.tsx`): Tabbed interface for switching between views.
 
-```
-/app
-  layout.tsx        # Root layout with Fonts & Providers
-  globals.css       # CSS Variables & Tailwind directives
-  /(dashboard)      # Protected routes
-/components
-  /ui               # Generic, reusable primitives (Button, Card, etc.)
-  dashboard-shell.tsx # Main layout wrapper
-  sidebar.tsx       # Desktop navigation
-  ...
-/lib
-  utils.ts          # cn() helper for class merging
-```
+## 6. Coding Conventions
 
-## 6. Iconography
-*   **Library**: Lucide React
-*   **Usage**:
-    *   **Navigation**: Simple, recognizable icons (CreditCard, Target, Activity).
-    *   **Actions**: Edit (Pencil), Delete (Trash), Save (Save).
-    *   **Status**: CheckCircle (Success), AlertTriangle (Error), Loader2 (Loading).
-*   **Style**: Consistent stroke width, typically `h-4 w-4` or `h-5 w-5`.
+- **Class Merging**: Always use the `cn()` utility when allowing custom `className` props to ensure Tailwind classes merge correctly without conflicts.
+  ```tsx
+  className={cn("base-styles", className)}
+  ```
+- **Accessibility**:
+  - Ensure all interactive elements have focus states (`focus-visible:ring`).
+  - Use semantic HTML or appropriate ARIA roles (handled largely by Radix UI).
+- **Dark Mode**:
+  - Use standard tokens (`bg-background`, `text-foreground`) to ensure automatic dark mode compatibility.
+  - Avoid hardcoding hex values unless strictly necessary for specific brand elements that don't change.
