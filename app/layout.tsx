@@ -1,6 +1,6 @@
 import "./globals.css";
 import { Outfit } from "next/font/google";
-import { ReactNode } from "react";
+import { ReactNode, Suspense } from "react";
 import { cn } from "@/lib/utils";
 import { Providers } from "@/components/providers";
 import { TrafficTracker } from "@/components/traffic-tracker";
@@ -15,7 +15,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body className={cn(outfit.className, "min-h-screen bg-background text-foreground tracking-[var(--tracking-normal)]")} suppressHydrationWarning>
         <Providers>
-          <TrafficTracker />
+          <Suspense fallback={null}>
+            <TrafficTracker />
+          </Suspense>
           {children}
         </Providers>
       </body>

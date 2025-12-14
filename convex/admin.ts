@@ -46,6 +46,24 @@ export const seedAdmin = mutation({
   },
 });
 
+// 1b. Promote specific user to Admin
+export const promoteToAdmin = mutation({
+  args: { email: v.string() },
+  handler: async (ctx: any, args: any) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q: any) => q.eq("email", args.email))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    await ctx.db.patch(user._id, { role: "admin" });
+    return `User ${args.email} promoted to admin`;
+  },
+});
+
 // Helper: Ensure caller is admin
 async function ensureAdmin(ctx: any, userKey: string) {
     const user = await getUserFromToken(ctx, userKey);
