@@ -19,7 +19,10 @@ export function MetricCard({ label, value, subtext, trend, colorVar, onClick }: 
       className={cn("border-none shadow-sm transition-shadow hover:shadow-md", onClick && "cursor-pointer")}
       onClick={onClick}
     >
-      <CardContent className={cn("p-6 rounded-2xl", `bg-[hsl(var(${colorVar}))]`)}>
+      <CardContent 
+        className="p-6 rounded-2xl"
+        style={{ backgroundColor: `hsl(var(${colorVar}))` }}
+      >
         <div className="flex items-start justify-between">
           <div className="text-sm font-medium text-gray-600">{label}</div>
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/50">
