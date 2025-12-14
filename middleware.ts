@@ -26,7 +26,7 @@ export function middleware(request: NextRequest) {
   }
 
   // 3. Get IP Address
-  const ip = request.ip || "127.0.0.1";
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || "127.0.0.1";
 
   // 4. Rate Limiting Logic
   const now = Date.now();

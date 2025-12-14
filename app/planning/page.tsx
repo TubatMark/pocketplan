@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
@@ -12,7 +13,7 @@ import { Target, Sparkles, Loader2, FileText, CheckCircle2 } from "lucide-react"
 import { GoalCardSkeleton } from "@/components/skeletons";
 import { useSearchParams } from "next/navigation";
 
-export default function PlanningPage() {
+function PlanningContent() {
   const userKey = useUserKey();
   const searchParams = useSearchParams();
   const goalIdParam = searchParams.get("goalId");
@@ -110,7 +111,7 @@ export default function PlanningPage() {
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500">
-                You haven't created any goals yet. Go to the Goals page to start.
+                You haven&apos;t created any goals yet. Go to the Goals page to start.
               </div>
             )}
           </CardContent>
@@ -195,7 +196,7 @@ export default function PlanningPage() {
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900">No Plan Generated Yet</h3>
                 <p className="text-sm text-gray-500 max-w-sm mt-2">
-                  Click the "Generate AI Plan" button above to get a customized strategy for reaching your <strong>{selectedGoal?.slug}</strong> goal.
+                  Click the &quot;Generate AI Plan&quot; button above to get a customized strategy for reaching your <strong>{selectedGoal?.slug}</strong> goal.
                 </p>
               </div>
             )}
@@ -203,5 +204,13 @@ export default function PlanningPage() {
         )}
       </div>
     </DashboardShell>
+  );
+}
+
+export default function PlanningPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <PlanningContent />
+    </Suspense>
   );
 }

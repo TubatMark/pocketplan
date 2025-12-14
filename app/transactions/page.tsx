@@ -208,7 +208,7 @@ function TransactionsContent() {
                        <option key={g._id} value={g._id}>{g.slug} (Target: ₱{g.target_amount.toLocaleString()})</option>
                      ))}
                    </Select>
-                   <p className="text-xs text-gray-400 mt-1">If selected, this amount will contribute towards the goal's progress.</p>
+                   <p className="text-xs text-gray-400 mt-1">If selected, this amount will contribute towards the goal&apos;s progress.</p>
                 </div>
               </div>
             )}

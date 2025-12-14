@@ -5,6 +5,7 @@ type ToastProps = {
   title?: string;
   description?: string;
   variant?: "default" | "destructive";
+  className?: string;
 };
 
 export function useToast() {

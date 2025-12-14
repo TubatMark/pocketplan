@@ -81,7 +81,7 @@ export default function DebtsPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Debt Management</h2>
-            <p className="text-muted-foreground">Track what you owe and what's owed to you.</p>
+            <p className="text-muted-foreground">Track what you owe and what&apos;s owed to you.</p>
           </div>
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
