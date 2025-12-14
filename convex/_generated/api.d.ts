@@ -9,6 +9,7 @@
  */
 
 import type * as activities from "../activities.js";
+import type * as admin from "../admin.js";
 import type * as analytics from "../analytics.js";
 import type * as auth from "../auth.js";
 import type * as backup from "../backup.js";
@@ -17,6 +18,7 @@ import type * as crons from "../crons.js";
 import type * as debts from "../debts.js";
 import type * as goals from "../goals.js";
 import type * as plans from "../plans.js";
+import type * as security from "../security.js";
 import type * as transactions from "../transactions.js";
 import type * as users from "../users.js";
 import type * as wallets from "../wallets.js";
@@ -29,6 +31,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   activities: typeof activities;
+  admin: typeof admin;
   analytics: typeof analytics;
   auth: typeof auth;
   backup: typeof backup;
@@ -37,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   debts: typeof debts;
   goals: typeof goals;
   plans: typeof plans;
+  security: typeof security;
   transactions: typeof transactions;
   users: typeof users;
   wallets: typeof wallets;

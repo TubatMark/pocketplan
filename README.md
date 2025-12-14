@@ -30,6 +30,12 @@ PocketPlan is a minimal, calm personal finance application designed to help you 
 - **Activity Log**: See a timeline of all your financial actions (transactions, goal updates, debt changes).
 - **Charts**: Visual breakdowns of income, expenses, and savings over time.
 
+### 🛡️ Admin Dashboard
+- **Secure Access**: Role-based access control protected by `AdminGuard`.
+- **User Management**: View, search, promote/demote, and delete users.
+- **System Stats**: Monitor total users, active users, and transaction volume.
+- **Setup**: Seed the initial admin account via CLI.
+
 ### 🤖 AI Planning (Coming Soon)
 - Generate personalized financial plans based on your goals and spending habits.
 
@@ -72,20 +78,30 @@ PocketPlan is a minimal, calm personal finance application designed to help you 
     pnpm run convex
     ```
 
-5.  **Start the Frontend:**
+5.  **Seed Admin User (Optional):**
+    To access the admin dashboard, create the initial admin account:
+    ```bash
+    npx convex run admin:seedAdmin
+    ```
+    *   **Email**: `admin@admin.com`
+    *   **Password**: `admin123`
+
+6.  **Start the Frontend:**
     Run the Next.js development server:
     ```bash
     pnpm dev
     ```
 
-6.  **Open the App:**
+7.  **Open the App:**
     Visit [http://localhost:3000](http://localhost:3000) in your browser.
+    *   Admin Dashboard: [http://localhost:3000/admin/dashboard](http://localhost:3000/admin/dashboard)
 
 ## Project Structure
 
 ```
 pocketplan/
 ├── app/                  # Next.js App Router pages & layouts
+│   ├── admin/            # Admin dashboard & user management
 │   ├── activities/       # Activity log page
 │   ├── debts/            # Debt management page
 │   ├── goals/            # Goal setting & tracking
@@ -93,10 +109,12 @@ pocketplan/
 │   ├── wallets/          # Wallet management
 │   └── ...
 ├── components/           # Reusable UI components
+│   ├── admin/            # Admin-specific components (Sidebar, Guard)
 │   ├── ui/               # Shadcn UI primitives
 │   ├── chart/            # Chart components
 │   └── ...
 ├── convex/               # Convex backend functions & schema
+│   ├── admin.ts          # Admin mutations & queries
 │   ├── schema.ts         # Database schema definition
 │   ├── debts.ts          # Debt-related mutations/queries
 │   ├── goals.ts          # Goal-related mutations/queries

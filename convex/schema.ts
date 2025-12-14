@@ -6,6 +6,8 @@ export default defineSchema({
     email: v.string(),
     password: v.string(), // Hashed password
     name: v.string(),
+    role: v.optional(v.string()), // "admin" or undefined/null for regular users
+    last_active: v.optional(v.number()),
     created_at: v.number(),
   }).index("by_email", ["email"]),
 
@@ -108,4 +110,19 @@ export default defineSchema({
     key: v.string(),
     value: v.any(),
   }).index("by_key", ["key"]),
+
+  rate_limits: defineTable({
+    identifier: v.string(), // IP or User ID
+    count: v.number(),
+    last_reset: v.number(),
+    blocked_until: v.optional(v.number()),
+  }).index("by_identifier", ["identifier"]),
+
+  security_logs: defineTable({
+    identifier: v.string(),
+    action: v.string(), // "blocked", "captcha_challenge", "captcha_solved"
+    reason: v.optional(v.string()),
+    metadata: v.optional(v.any()),
+    timestamp: v.number(),
+  }).index("by_identifier", ["identifier"]),
 });
