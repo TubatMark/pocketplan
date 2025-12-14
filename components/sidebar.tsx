@@ -13,7 +13,8 @@ import {
   Activity,
   CreditCard,
   Database,
-  List
+  List,
+  MessageSquare
 } from "lucide-react";
 
 const mainMenu = [
@@ -22,12 +23,13 @@ const mainMenu = [
   { href: "/goals", label: "Goals", icon: Target },
   { href: "/activities", label: "Activities", icon: List },
   { href: "/debts", label: "Debts", icon: CreditCard },
-  { href: "/planning", label: "Plan", icon: Activity }, // Note: Both use Activity icon currently, might want to change Plan icon
+  { href: "/planning", label: "Plan", icon: Activity },
   { href: "/backup", label: "Backup", icon: Database },
 ];
 
 const accountMenu = [
   { href: "/wallets", label: "My Wallets", icon: Wallet },
+  { href: "/messages", label: "Messages", icon: MessageSquare },
   { href: "/settings", label: "Setting", icon: Settings },
 ];
 

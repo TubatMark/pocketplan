@@ -120,6 +120,18 @@ export default defineSchema({
     timestamp: v.number(),
   }).index("by_timestamp", ["timestamp"]).index("by_session", ["session_id"]),
 
+  messages: defineTable({
+    user_id: v.id("users"), // The user involved (sender or recipient)
+    subject: v.string(),
+    content: v.string(),
+    direction: v.union(v.literal("inbound"), v.literal("outbound")), // inbound = user to admin, outbound = admin to user
+    status: v.string(), // "sent", "read", "replied", "archived"
+    parent_id: v.optional(v.id("messages")), // For threading
+    attachments: v.optional(v.array(v.string())), // List of file URLs or IDs
+    created_at: v.number(),
+    updated_at: v.number(),
+  }).index("by_user", ["user_id"]).index("by_user_created", ["user_id", "created_at"]).index("by_parent", ["parent_id"]),
+
   settings: defineTable({
     key: v.string(),
     value: v.any(),
