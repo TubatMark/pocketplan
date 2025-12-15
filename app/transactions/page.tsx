@@ -266,7 +266,7 @@ function TransactionsContent() {
                       transfer_from_wallet_id: fromWalletId as any, 
                       transfer_to_wallet_id: toWalletId as any, 
                       notes,
-                      goal_id: goalId as any // Pass goal ID
+                      goal_id: goalId ?? undefined // Pass goal ID
                     });
                   } else {
                     if (!walletId) return;
@@ -278,7 +278,7 @@ function TransactionsContent() {
                       wallet_id: walletId as any, 
                       method, 
                       notes,
-                      goal_id: goalId as any // Pass goal ID
+                      goal_id: goalId ?? undefined // Pass goal ID
                     });
                   }
                   setAmount(0);

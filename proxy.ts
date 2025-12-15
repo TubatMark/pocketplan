@@ -8,7 +8,7 @@ const rateLimitMap = new Map<string, { count: number; lastReset: number }>();
 const WINDOW_MS = 60 * 1000; // 1 minute
 const MAX_REQUESTS = 100; // 100 requests per minute
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   // 1. Skip static assets and API routes that handle the verification itself
   if (
     request.nextUrl.pathname.startsWith("/_next") ||

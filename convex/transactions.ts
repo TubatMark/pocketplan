@@ -21,6 +21,11 @@ export const log = mutation({
     if (!user) throw new Error("Unauthorized");
 
     const now = args.timestamp ?? Date.now();
+
+    if (args.type === "savings" && !args.goal_id) {
+      throw new Error("Savings transaction requires a goal");
+    }
+
     if (args.type === "transfer") {
       if (!args.transfer_from_wallet_id || !args.transfer_to_wallet_id) throw new Error("Transfer requires from/to wallets");
       const from = await ctx.db.get(args.transfer_from_wallet_id);
