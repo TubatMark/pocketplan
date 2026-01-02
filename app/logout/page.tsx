@@ -14,7 +14,7 @@ export default function LogoutPage() {
       signOut({ token }).catch(console.error);
     }
     clearUserKey();
-    router.push("/login");
+    router.push("/");
   }, [router, signOut]);
 
   return (

@@ -11,9 +11,9 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    // If no session token, redirect to login
+    // If no session token, redirect to sign-in
     if (typeof window !== "undefined" && !window.localStorage.getItem("pp_session_token")) {
-      router.push("/login");
+      router.push("/sign-in");
     }
   }, [userKey, router]);
 

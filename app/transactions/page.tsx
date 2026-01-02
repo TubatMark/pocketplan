@@ -298,17 +298,17 @@ function TransactionsContent() {
         </Card>
 
         <Card className="border-none shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <CardTitle>Recent Transactions</CardTitle>
-            <div className="flex gap-2">
-              <Select value={filterType} onChange={(e) => setFilterType(e.target.value as any)} className="w-[120px] h-8 text-xs">
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <Select value={filterType} onChange={(e) => setFilterType(e.target.value as any)} className="w-full sm:w-[120px] h-9 sm:h-8 text-xs">
                 <option value="all">All Types</option>
                 <option value="income">Income</option>
                 <option value="expense">Expense</option>
                 <option value="transfer">Transfer</option>
                 <option value="savings">Savings</option>
               </Select>
-              <Select value={dateRange} onChange={(e) => setDateRange(e.target.value as any)} className="w-[120px] h-8 text-xs">
+              <Select value={dateRange} onChange={(e) => setDateRange(e.target.value as any)} className="w-full sm:w-[120px] h-9 sm:h-8 text-xs">
                 <option value="all">All Dates</option>
                 <option value="today">Today</option>
                 <option value="week">This Week</option>
@@ -320,11 +320,11 @@ function TransactionsContent() {
             <div className="mb-4">
                <div className="relative">
                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                 <Input 
-                   placeholder="Search transactions..." 
+                 <Input
+                   placeholder="Search transactions..."
                    value={searchQuery}
                    onChange={(e) => setSearchQuery(e.target.value)}
-                   className="pl-9"
+                   className="pl-9 h-10"
                  />
                </div>
             </div>
@@ -333,23 +333,64 @@ function TransactionsContent() {
               <TransactionListSkeleton />
             ) : (
             <>
-            <div className="rounded-3xl bg-white shadow-sm overflow-hidden">
-              <table className="w-full">
+            {/* Mobile Card View */}
+            <div className="sm:hidden space-y-3">
+              {(paginatedTransactions ?? []).map((t: any) => {
+                const walletName = wallets?.find(w => w._id === t.wallet_id)?.name ||
+                                 (t.type === 'transfer' ? 'Transfer' : 'Wallet');
+                return (
+                  <div key={t._id} className="rounded-2xl bg-white border border-gray-100 p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <Avatar className="h-10 w-10 shrink-0">
+                          <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${t.category}`} />
+                          <AvatarFallback>{t.category?.[0]}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <span className="font-medium text-gray-900 block truncate">{t.category || "Transaction"}</span>
+                          {t.notes && <span className="text-xs text-gray-400 truncate block">{t.notes}</span>}
+                          <span className="text-xs text-gray-400 mt-1 block">{walletName}</span>
+                        </div>
+                      </div>
+                      <div className={`text-right font-semibold ${
+                        t.type === 'income' ? 'text-green-600' :
+                        t.type === 'savings' ? 'text-emerald-600' :
+                        'text-gray-900'
+                      }`}>
+                        {t.type === 'income' ? '+' : ''}₱{t.amount.toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-50">
+                      {format(new Date(t.created_at), "MMM d, yyyy 'at' h:mm a")}
+                    </div>
+                  </div>
+                );
+              })}
+              {(!paginatedTransactions || paginatedTransactions.length === 0) && (
+                <div className="rounded-2xl bg-gray-50 p-8 text-center text-sm text-gray-400">
+                  No transactions found
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden sm:block rounded-3xl bg-white shadow-sm overflow-x-auto -mx-4 sm:mx-0">
+              <table className="w-full min-w-[600px]">
                 <thead className="border-b border-gray-50 bg-gray-50/50">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Name</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Wallet</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Date</th>
-                    <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Amount</th>
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Name</th>
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Wallet</th>
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Date</th>
+                    <th className="px-4 sm:px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Amount</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {(paginatedTransactions ?? []).map((t: any) => {
-                    const walletName = wallets?.find(w => w._id === t.wallet_id)?.name || 
+                    const walletName = wallets?.find(w => w._id === t.wallet_id)?.name ||
                                      (t.type === 'transfer' ? 'Transfer' : 'Wallet');
                     return (
                     <tr key={t._id} className="hover:bg-gray-50/50">
-                      <td className="px-6 py-4">
+                      <td className="px-4 sm:px-6 py-4">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
                             <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${t.category}`} />
@@ -361,14 +402,14 @@ function TransactionsContent() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
+                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-500">
                         {walletName}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
+                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-500">
                         {format(new Date(t.created_at), "MMM d, yyyy")}
                       </td>
-                      <td className={`px-6 py-4 text-right font-semibold ${
-                        t.type === 'income' ? 'text-green-600' : 
+                      <td className={`px-4 sm:px-6 py-4 text-right font-semibold ${
+                        t.type === 'income' ? 'text-green-600' :
                         t.type === 'savings' ? 'text-emerald-600' :
                         'text-gray-900'
                       }`}>
@@ -378,7 +419,7 @@ function TransactionsContent() {
                   )})}
                   {(!paginatedTransactions || paginatedTransactions.length === 0) && (
                      <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-sm text-gray-400">
+                      <td colSpan={4} className="px-4 sm:px-6 py-8 text-center text-sm text-gray-400">
                         No transactions found
                       </td>
                     </tr>
@@ -386,30 +427,32 @@ function TransactionsContent() {
                 </tbody>
               </table>
             </div>
-            
+
             {/* Pagination Controls */}
             {filteredTransactions.length > ITEMS_PER_PAGE && (
-              <div className="flex items-center justify-between border-t px-6 py-4 mt-4">
-                <div className="text-sm text-muted-foreground">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-t px-4 sm:px-6 py-4 mt-4">
+                <div className="text-sm text-muted-foreground text-center sm:text-left">
                   Page {currentPage} of {totalPages}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                <div className="flex items-center justify-center sm:justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => handlePageChange(currentPage - 1)}
                     disabled={currentPage === 1}
+                    className="flex-1 sm:flex-none"
                   >
                     <ChevronLeft className="h-4 w-4" />
-                    Previous
+                    <span className="hidden sm:inline">Previous</span>
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => handlePageChange(currentPage + 1)}
                     disabled={currentPage === totalPages}
+                    className="flex-1 sm:flex-none"
                   >
-                    Next
+                    <span className="hidden sm:inline">Next</span>
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>

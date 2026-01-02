@@ -9,8 +9,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Clock, ExternalLink, Globe, Smartphone, Monitor, Tablet } from "lucide-react";
+import { format } from "date-fns";
 
 interface TrafficTableProps {
   logs: any[];
@@ -19,73 +19,107 @@ interface TrafficTableProps {
   isLoading: boolean;
 }
 
-export function TrafficTable({ logs, status, loadMore, isLoading }: TrafficTableProps) {
-  // We'll manage client-side pagination here for the fetched logs
-  // But wait, the Convex pagination loads *more* data, appending it.
-  // The requirement is "pagination system... limit 10 items per page".
-  // So we should probably use usePaginatedQuery and only show one page at a time?
-  // Actually, Convex `usePaginatedQuery` returns a flat list of all loaded items.
-  // Standard practice with Convex is "Load More" (infinite scroll), but user asked for "Previous/Next buttons".
-  // To achieve true "Page 1, Page 2" with Convex, we usually just fetch big chunks or use skip/take (which is slow).
-  // OR, we can just load more and slice the array on the client side.
-  // Let's implement client-side slicing of the accumulated `logs` for now, or stick to "Load More" button if acceptable?
-  // User explicitly asked for "Previous/Next buttons" and "Page number indicators".
-  // Given Convex architecture, the best way to support random page access is hard.
-  // BUT, we can support "Next" by loading more, and "Prev" by just showing the previous slice of already loaded data.
-  // Let's do that: Client-side pagination of the *accumulated* data.
-  
-  // Actually, wait. If we have 1000 logs, we don't want to load all 1000 to show page 100.
-  // However, Convex `paginate` is cursor based. We can only go forward.
-  // So "Next" loads the next page. "Prev" isn't really possible unless we keep the old data.
-  // The `usePaginatedQuery` hook returns `results` (all loaded so far).
-  // So we can implement a UI that *looks* like pagination but actually just slices the `results` array.
-  // If user clicks "Next" and we are at the end of `results`, we call `loadMore`.
-  
-  // Let's modify the component to handle this logic internally or accept props.
-  // Actually, the parent component should probably handle the logic.
-  // Let's update the props to accept `onNextPage`, `onPrevPage`, `currentPage`, `totalPages`, etc?
-  // No, let's keep it simple.
-  
+const getDeviceIcon = (deviceType?: string) => {
+  const type = deviceType?.toLowerCase() || "";
+  if (type.includes("mobile") || type.includes("phone")) return Smartphone;
+  if (type.includes("tablet")) return Tablet;
+  return Monitor;
+};
+
+export function TrafficTable({ logs }: TrafficTableProps) {
   return (
     <div className="space-y-4">
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Time</TableHead>
-              <TableHead>Path</TableHead>
-              <TableHead>Source</TableHead>
-              <TableHead>Location</TableHead>
-              <TableHead>Device</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {logs.length === 0 ? (
+      {/* Mobile Card View */}
+      <div className="sm:hidden space-y-3">
+        {logs.length === 0 ? (
+          <div className="rounded-xl border border-dashed bg-gray-50 p-8 text-center text-sm text-muted-foreground">
+            No logs found.
+          </div>
+        ) : (
+          logs.map((log) => {
+            const DeviceIcon = getDeviceIcon(log.device_type);
+            const source = log.referrer ? new URL(log.referrer).hostname : "Direct";
+            return (
+              <div key={log._id} className="rounded-xl border bg-white p-3 shadow-sm">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <DeviceIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <Badge variant="outline" className="text-xs shrink-0">
+                      {log.device_type || "Desktop"}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    <span>{format(new Date(log.timestamp), "MMM d, h:mm a")}</span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1 text-sm">
+                    <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
+                    <span className="font-medium truncate">{log.path}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Globe className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{source}</span>
+                    {log.city && log.country && (
+                      <>
+                        <span>•</span>
+                        <span>{log.city}, {log.country}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden sm:block rounded-xl border bg-white overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground h-24">
-                  No logs found.
-                </TableCell>
+                <TableHead>Time</TableHead>
+                <TableHead>Path</TableHead>
+                <TableHead>Source</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead>Device</TableHead>
               </TableRow>
-            ) : (
-              logs.map((log) => (
-                <TableRow key={log._id}>
-                  <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
-                  <TableCell className="font-medium">{log.path}</TableCell>
-                  <TableCell>{log.referrer ? new URL(log.referrer).hostname : "Direct"}</TableCell>
-                  <TableCell>{log.city && log.country ? `${log.city}, ${log.country}` : "Unknown"}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{log.device_type || "Desktop"}</Badge>
+            </TableHeader>
+            <TableBody>
+              {logs.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground h-24">
+                    No logs found.
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                logs.map((log) => (
+                  <TableRow key={log._id}>
+                    <TableCell className="text-sm whitespace-nowrap">
+                      {format(new Date(log.timestamp), "MMM d, yyyy 'at' h:mm a")}
+                    </TableCell>
+                    <TableCell className="font-medium">{log.path}</TableCell>
+                    <TableCell>{log.referrer ? new URL(log.referrer).hostname : "Direct"}</TableCell>
+                    <TableCell>{log.city && log.country ? `${log.city}, ${log.country}` : "Unknown"}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="gap-1">
+                        {(() => {
+                          const Icon = getDeviceIcon(log.device_type);
+                          return <Icon className="h-3 w-3" />;
+                        })()}
+                        {log.device_type || "Desktop"}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
-      
-      {/* Pagination Controls will be rendered by the parent to maintain state there, 
-          or we can render them here if we pass the right callbacks. 
-          Let's just render the data here and let parent handle controls. */}
     </div>
   );
 }

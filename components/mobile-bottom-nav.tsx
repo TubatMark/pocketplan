@@ -22,7 +22,7 @@ import {
 import { Sidebar } from "./sidebar";
 
 const navItems = [
-  { href: "/", label: "Home", icon: Home },
+  { href: "/dashboard", label: "Home", icon: Home },
   { href: "/transactions", label: "Transact", icon: ArrowRightLeft },
   { href: "/goal", label: "Goals", icon: Target },
   { href: "/debts", label: "Debts", icon: CreditCard },

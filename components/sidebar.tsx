@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 
 const mainMenu = [
-  { href: "/", label: "Home", icon: Home },
+  { href: "/dashboard", label: "Home", icon: Home },
   { href: "/transactions", label: "Transaction", icon: ArrowRightLeft },
   { href: "/goals", label: "Goals", icon: Target },
   { href: "/activities", label: "Activities", icon: List },
