@@ -19,12 +19,13 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { Sidebar } from "./sidebar";
 
 const navItems = [
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/transactions", label: "Transact", icon: ArrowRightLeft },
-  { href: "/goal", label: "Goals", icon: Target },
+  { href: "/goals", label: "Goals", icon: Target },
   { href: "/debts", label: "Debts", icon: CreditCard },
   { href: "/planning", label: "Plan", icon: Activity },
   { href: "/backup", label: "Backup", icon: Database },
@@ -65,6 +66,11 @@ export function MobileBottomNav() {
             </button>
           </SheetTrigger>
           <SheetContent side="left" className="p-0 w-[300px]">
+            <VisuallyHidden>
+              <SheetHeader>
+                <SheetTitle>Navigation Menu</SheetTitle>
+              </SheetHeader>
+            </VisuallyHidden>
             {/* Reusing the existing Sidebar content inside the sheet */}
             <div className="h-full overflow-y-auto">
                <Sidebar mobile />

@@ -17,43 +17,43 @@ export function IncomeChart({ data, total }: { data: any[], total?: number }) {
 
   return (
     <Card className="border-none bg-emerald-600 text-white shadow-lg">
-      <CardHeader className="flex flex-row items-center justify-between border-none pb-2">
-        <div>
-          <CardTitle className="text-lg font-medium text-white/90">Income</CardTitle>
+      <CardHeader className="flex flex-row items-start sm:items-center justify-between border-none gap-4 pb-2">
+        <div className="min-w-0 flex-1">
+          <CardTitle className="text-base sm:text-lg font-medium text-white/90">Income</CardTitle>
           <div className="mt-1 flex items-center gap-2">
-            <span className="text-2xl font-bold">₱{(total ?? 0).toLocaleString()}</span>
-            {/* Trend placeholder - could be passed as prop */}
-            <span className="flex items-center rounded-full bg-white/20 px-2 py-0.5 text-xs font-medium text-white">
+            <span className="text-xl sm:text-2xl font-bold">₱{(total ?? 0).toLocaleString()}</span>
+            <span className="hidden sm:flex items-center rounded-full bg-white/20 px-2 py-0.5 text-xs font-medium text-white">
               <ArrowUpRight className="mr-1 h-3 w-3" />
               +12.5%
             </span>
           </div>
         </div>
-        <button className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/20">
-          This Week
+        <button className="flex items-center gap-1.5 sm:gap-2 rounded-lg bg-white/10 px-2 sm:px-3 py-1.5 text-xs font-medium text-white hover:bg-white/20 shrink-0">
+          <span className="hidden sm:inline">This Week</span>
+          <span className="sm:hidden">Week</span>
           <Calendar className="h-3 w-3" />
         </button>
       </CardHeader>
       <CardContent>
-        <div className="h-[200px] w-full">
+        <div className="h-[160px] sm:h-[180px] md:h-[200px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} barSize={12}>
-              <XAxis 
-                dataKey="day" 
-                axisLine={false} 
-                tickLine={false} 
-                tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 12 }} 
+            <BarChart data={chartData} barSize={8}>
+              <XAxis
+                dataKey="day"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 10 }}
                 dy={10}
               />
-              <Tooltip 
+              <Tooltip
                 cursor={{ fill: 'rgba(255,255,255,0.1)' }}
-                contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: 'none', color: '#000' }}
+                contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: 'none', color: '#000', fontSize: '12px' }}
                 formatter={(value: number) => [`₱${value.toLocaleString()}`, "Income"]}
               />
-              <Bar 
-                dataKey="amount" 
-                fill="rgba(255,255,255,0.9)" 
-                radius={[4, 4, 4, 4]} 
+              <Bar
+                dataKey="amount"
+                fill="rgba(255,255,255,0.9)"
+                radius={[4, 4, 4, 4]}
               />
             </BarChart>
           </ResponsiveContainer>

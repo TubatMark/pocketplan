@@ -74,18 +74,18 @@ export default function ActivitiesPage() {
       <div className="space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">All Activities</h2>
-            <p className="text-muted-foreground">View and filter your entire activity history.</p>
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight">All Activities</h2>
+            <p className="text-muted-foreground text-sm sm:text-base">View and filter your entire activity history.</p>
           </div>
-          
-          <div className="flex gap-2">
-            <Select 
-              value={filterType} 
+
+          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+            <Select
+              value={filterType}
               onChange={(e) => {
                 setFilterType(e.target.value as any);
                 setCurrentPage(1);
               }}
-              className="w-[150px]"
+              className="w-full sm:w-[150px] h-9 sm:h-auto"
             >
               <option value="all">All Types</option>
               <option value="income">Income</option>
@@ -95,13 +95,13 @@ export default function ActivitiesPage() {
               <option value="wallet_create">System</option>
             </Select>
 
-            <Select 
-              value={dateRange} 
+            <Select
+              value={dateRange}
               onChange={(e) => {
                 setDateRange(e.target.value as any);
                 setCurrentPage(1);
               }}
-              className="w-[150px]"
+              className="w-full sm:w-[150px] h-9 sm:h-auto"
             >
               <option value="all">All Time</option>
               <option value="today">Today</option>
@@ -124,30 +124,33 @@ export default function ActivitiesPage() {
                 </div>
                 
                 {/* Pagination Controls */}
-                <div className="flex items-center justify-between border-t px-6 py-4">
-                  <div className="text-sm text-muted-foreground">
-                    Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredActivities.length)} of {filteredActivities.length} results
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-t px-4 sm:px-6 py-4">
+                  <div className="text-sm text-muted-foreground text-center sm:text-left">
+                    <span className="hidden sm:inline">Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredActivities.length)} of {filteredActivities.length} results</span>
+                    <span className="sm:hidden">{((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, filteredActivities.length)} of {filteredActivities.length}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                  <div className="flex items-center justify-center sm:justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => handlePageChange(currentPage - 1)}
                       disabled={currentPage === 1}
+                      className="flex-1 sm:flex-none"
                     >
                       <ChevronLeft className="h-4 w-4" />
-                      Previous
+                      <span className="hidden sm:inline">Previous</span>
                     </Button>
-                    <div className="text-sm font-medium">
-                      Page {currentPage} of {totalPages}
+                    <div className="text-sm font-medium px-2">
+                      {currentPage} / {totalPages}
                     </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => handlePageChange(currentPage + 1)}
                       disabled={currentPage === totalPages}
+                      className="flex-1 sm:flex-none"
                     >
-                      Next
+                      <span className="hidden sm:inline">Next</span>
                       <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>
