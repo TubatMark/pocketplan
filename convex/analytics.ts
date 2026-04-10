@@ -158,7 +158,7 @@ export const dashboard = query({
     const prevRange = txs.filter((t: any) => t.created_at >= startPrev && t.created_at <= endPrev);
 
     const income = currentRange.filter((t: any) => t.type === "income").reduce((a: number, b: any) => a + b.amount, 0);
-    const expense = currentRange.filter((t: any) => t.type === "expense").reduce((a: number, b: any) => a + b.amount, 0);
+    const expense = currentRange.filter((t: any) => t.type === "expense" || t.type === "savings" || t.type === "debt_payment").reduce((a: number, b: any) => a + b.amount, 0);
     const transferVolume = currentRange.filter((t: any) => t.type === "transfer").reduce((a: number, b: any) => a + b.amount, 0);
     const net = income - expense;
 
@@ -169,7 +169,7 @@ export const dashboard = query({
     // Previous month expense per day
     const prevDaysInMonth = new Date(prevYear, prevMonth + 1, 0).getDate();
     const prevIncome = prevRange.filter((t: any) => t.type === "income").reduce((a: number, b: any) => a + b.amount, 0);
-    const prevExpense = prevRange.filter((t: any) => t.type === "expense").reduce((a: number, b: any) => a + b.amount, 0);
+    const prevExpense = prevRange.filter((t: any) => t.type === "expense" || t.type === "savings" || t.type === "debt_payment").reduce((a: number, b: any) => a + b.amount, 0);
     const prevExpensePerDay = prevDaysInMonth > 0 ? prevExpense / prevDaysInMonth : 0;
     const prevNet = prevIncome - prevExpense;
 

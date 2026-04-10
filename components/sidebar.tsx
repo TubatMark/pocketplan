@@ -2,12 +2,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { 
-  Home, 
-  PieChart, 
-  ArrowRightLeft, 
-  Wallet, 
-  Settings, 
+import {
+  Home,
+  PieChart,
+  ArrowRightLeft,
+  Wallet,
+  Settings,
   LogOut,
   Target,
   Activity,
@@ -15,12 +15,14 @@ import {
   Database,
   List,
   MessageSquare,
-  UserCircle
+  UserCircle,
+  CalendarDays
 } from "lucide-react";
 
 const mainMenu = [
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/transactions", label: "Transaction", icon: ArrowRightLeft },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/goals", label: "Goals", icon: Target },
   { href: "/activities", label: "Activities", icon: List },
   { href: "/debts", label: "Debts", icon: CreditCard },
