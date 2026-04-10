@@ -45,9 +45,9 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
   // Initial loading state
   if (user === undefined) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50" role="status" aria-label="Verifying admin access">
         <div className="text-center">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600 mx-auto mb-4"></div>
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600 mx-auto mb-4" aria-hidden="true"></div>
           <p className="text-gray-500 text-sm">Verifying admin access...</p>
         </div>
       </div>
@@ -100,7 +100,7 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
             </div>
 
             <p className="mt-6 text-xs text-gray-400">
-              Admin credentials: <span className="font-mono">admin@admin.com</span> / <span className="font-mono">admin123</span>
+              Contact your system administrator for access credentials.
             </p>
           </CardContent>
         </Card>

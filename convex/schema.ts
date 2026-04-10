@@ -15,7 +15,8 @@ export default defineSchema({
     userId: v.id("users"),
     token: v.string(),
     expiresAt: v.number(),
-  }).index("by_token", ["token"]),
+  }).index("by_token", ["token"])
+    .index("by_userId", ["userId"]),
 
   goals: defineTable({
     user_id: v.id("users"),
@@ -104,7 +105,8 @@ export default defineSchema({
     date: v.number(),
     transaction_id: v.optional(v.id("transactions")), // Link to main tx log
     notes: v.optional(v.string()),
-  }).index("by_debt", ["debt_id"]),
+  }).index("by_debt", ["debt_id"])
+    .index("by_user", ["user_id"]),
 
   traffic_logs: defineTable({
     path: v.string(),
@@ -134,7 +136,7 @@ export default defineSchema({
 
   settings: defineTable({
     key: v.string(),
-    value: v.any(),
+    value: v.union(v.string(), v.number(), v.boolean()),
   }).index("by_key", ["key"]),
 
   rate_limits: defineTable({
@@ -148,7 +150,10 @@ export default defineSchema({
     identifier: v.string(),
     action: v.string(), // "blocked", "captcha_challenge", "captcha_solved"
     reason: v.optional(v.string()),
-    metadata: v.optional(v.any()),
+    metadata: v.optional(v.object({
+      count: v.optional(v.number()),
+      limit: v.optional(v.number()),
+    })),
     timestamp: v.number(),
   }).index("by_identifier", ["identifier"]),
 });

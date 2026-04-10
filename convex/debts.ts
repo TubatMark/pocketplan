@@ -30,6 +30,13 @@ export const create = mutation({
     const user = await getUserFromToken(ctx, args.userKey);
     if (!user) throw new Error("Unauthorized");
 
+    // Server-side validation
+    if (!args.name || args.name.trim().length === 0) throw new Error("Name is required");
+    if (args.name.length > 200) throw new Error("Name too long");
+    if (args.total_amount <= 0 || args.total_amount > 999999999) throw new Error("Amount must be between 1 and 999,999,999");
+    if (args.interest_rate !== undefined && (args.interest_rate < 0 || args.interest_rate > 100)) throw new Error("Interest rate must be 0-100%");
+    if (args.notes && args.notes.length > 1000) throw new Error("Notes too long");
+
     // 1. Handle Wallet Transaction (Optional)
     if (args.walletId) {
       const wallet = await ctx.db.get(args.walletId);
@@ -142,14 +149,23 @@ export const remove = mutation({
     const debt = await ctx.db.get(args.debtId);
     if (!debt || debt.user_id !== user._id) throw new Error("Debt not found");
 
-    // Delete related payments? Or keep them as orphans? 
-    // Usually safer to delete or archive. Let's delete for MVP cleanup.
+    // Clean up related payments
     const payments = await ctx.db.query("debt_payments")
       .withIndex("by_debt", (q: any) => q.eq("debt_id", debt._id))
       .collect();
-    
+
     for (const p of payments) {
       await ctx.db.delete(p._id);
+    }
+
+    // Unlink transactions from this debt
+    const txs = await ctx.db.query("transactions")
+      .withIndex("by_user", (q: any) => q.eq("user_id", user._id))
+      .collect();
+    for (const tx of txs) {
+      if (tx.debt_id === debt._id) {
+        await ctx.db.patch(tx._id, { debt_id: undefined });
+      }
     }
 
     await ctx.db.delete(debt._id);
@@ -187,25 +203,27 @@ export const makePayment = mutation({
     let txId = undefined;
     if (args.walletId) {
       const wallet = await ctx.db.get(args.walletId);
-      if (wallet && wallet.user_id === user._id) {
-        // If I owe money (owed_by_you), paying it is an EXPENSE
-        // If someone owes me (owed_to_you), receiving it is INCOME
-        const type = debt.type === "owed_by_you" ? "expense" : "income";
-        const newBalance = type === "income" ? wallet.balance + args.amount : wallet.balance - args.amount;
+      if (!wallet || wallet.user_id !== user._id) throw new Error("Wallet not found");
 
-        await ctx.db.patch(wallet._id, { balance: newBalance });
+      // If I owe money (owed_by_you), paying it is an EXPENSE
+      // If someone owes me (owed_to_you), receiving it is INCOME
+      const type = debt.type === "owed_by_you" ? "expense" : "income";
+      const newBalance = type === "income" ? wallet.balance + args.amount : wallet.balance - args.amount;
 
-        txId = await ctx.db.insert("transactions", {
-          user_id: user._id,
-          debt_id: debt._id,
-          amount: args.amount,
-          type: "debt_payment", // Special type or map to inc/exp? Let's use debt_payment for clarity but track flow
-          category: "Debt Payment",
-          wallet_id: wallet._id,
-          created_at: Date.now(),
-          notes: args.notes,
-        });
-      }
+      if (newBalance < 0) throw new Error(`Insufficient funds in ${wallet.name}`);
+
+      await ctx.db.patch(wallet._id, { balance: newBalance });
+
+      txId = await ctx.db.insert("transactions", {
+        user_id: user._id,
+        debt_id: debt._id,
+        amount: args.amount,
+        type: "debt_payment",
+        category: "Debt Payment",
+        wallet_id: wallet._id,
+        created_at: Date.now(),
+        notes: args.notes,
+      });
     }
 
     // 3. Log in Debt Payments Table

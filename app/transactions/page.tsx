@@ -9,10 +9,10 @@ import { Button } from "@/components/ui/button";
 import { useData } from "@/hooks/use-data";
 import { useAction as useActionHook } from "@/hooks/use-action";
 import { TransactionListSkeleton } from "@/components/skeletons";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useUserKey } from "@/lib/session";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Search, Pencil, X } from "lucide-react";
 import { format } from "date-fns";
 
 const ITEMS_PER_PAGE = 10;
@@ -33,10 +33,50 @@ function TransactionsContent() {
   const { data: wallets } = useData<any[]>("wallets:list" as any, { userKey } as any);
   const { data: transactions, isLoading: isTransactionsLoading, refresh: refreshTransactions } = useData<any[]>("transactions:list" as any, { userKey } as any);
   
-  // Action hook
+  // Action hooks
   const { mutate: logTx, isLoading: isLogging } = useActionHook("transactions:log" as any, {
     onSuccess: () => refreshTransactions()
   });
+  const { mutate: updateTx, isLoading: isUpdating } = useActionHook("transactions:update" as any, {
+    onSuccess: () => { refreshTransactions(); setEditingTx(null); }
+  });
+
+  // Edit state
+  const [editingTx, setEditingTx] = useState<any>(null);
+  const [editAmount, setEditAmount] = useState(0);
+  const [editCategory, setEditCategory] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+
+  const openEdit = useCallback((tx: any) => {
+    setEditingTx(tx);
+    setEditAmount(tx.amount);
+    setEditCategory(tx.category || "");
+    setEditNotes(tx.notes || "");
+  }, []);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!editingTx || editAmount <= 0) return;
+    try {
+      await updateTx({
+        userKey,
+        transactionId: editingTx._id,
+        amount: editAmount,
+        category: editCategory,
+        notes: editNotes,
+      });
+    } catch (err: any) {
+      alert(err.message || "Failed to update transaction");
+    }
+  }, [editingTx, editAmount, editCategory, editNotes, userKey, updateTx]);
+
+  // Close edit dialog on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setEditingTx(null);
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
 
   const [type, setType] = useState("expense");
   const [amount, setAmount] = useState(0);
@@ -352,12 +392,17 @@ function TransactionsContent() {
                           <span className="text-xs text-gray-400 mt-1 block">{walletName}</span>
                         </div>
                       </div>
-                      <div className={`text-right font-semibold ${
-                        t.type === 'income' ? 'text-green-600' :
-                        t.type === 'savings' ? 'text-emerald-600' :
-                        'text-gray-900'
-                      }`}>
-                        {t.type === 'income' ? '+' : ''}₱{t.amount.toLocaleString()}
+                      <div className="flex items-center gap-2">
+                        <div className={`text-right font-semibold ${
+                          t.type === 'income' ? 'text-green-600' :
+                          t.type === 'savings' ? 'text-emerald-600' :
+                          'text-gray-900'
+                        }`}>
+                          {t.type === 'income' ? '+' : ''}₱{t.amount.toLocaleString()}
+                        </div>
+                        <button onClick={() => openEdit(t)} className="p-1 text-gray-400 hover:text-gray-600 rounded" aria-label="Edit transaction">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     </div>
                     <div className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-50">
@@ -382,6 +427,7 @@ function TransactionsContent() {
                     <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Wallet</th>
                     <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Date</th>
                     <th className="px-4 sm:px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Amount</th>
+                    <th className="px-4 sm:px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider w-16"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -415,11 +461,16 @@ function TransactionsContent() {
                       }`}>
                         {t.type === 'income' ? '+' : ''}₱{t.amount.toLocaleString()}
                       </td>
+                      <td className="px-4 sm:px-6 py-4 text-right">
+                        <button onClick={() => openEdit(t)} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors" aria-label="Edit transaction">
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      </td>
                     </tr>
                   )})}
                   {(!paginatedTransactions || paginatedTransactions.length === 0) && (
                      <tr>
-                      <td colSpan={4} className="px-4 sm:px-6 py-8 text-center text-sm text-gray-400">
+                      <td colSpan={5} className="px-4 sm:px-6 py-8 text-center text-sm text-gray-400">
                         No transactions found
                       </td>
                     </tr>
@@ -463,6 +514,72 @@ function TransactionsContent() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit Transaction Dialog */}
+      {editingTx && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" role="dialog" aria-modal="true" aria-label="Edit transaction" onClick={() => setEditingTx(null)}>
+          <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setEditingTx(null)}
+              className="absolute right-4 top-4 p-1 rounded-sm opacity-70 hover:opacity-100 transition-opacity"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <h2 className="text-lg font-semibold mb-1">Edit Transaction</h2>
+            <p className="text-sm text-gray-500 mb-5">
+              {editingTx.type.charAt(0).toUpperCase() + editingTx.type.slice(1)} &middot; {format(new Date(editingTx.created_at), "MMM d, yyyy")}
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <Label>Amount</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={editAmount}
+                  onChange={(e) => setEditAmount(Number(e.target.value))}
+                />
+              </div>
+              {editingTx.type !== "transfer" && (
+                <div>
+                  <Label>Category</Label>
+                  <Input
+                    value={editCategory}
+                    onChange={(e) => setEditCategory(e.target.value)}
+                  />
+                </div>
+              )}
+              <div>
+                <Label>Notes</Label>
+                <Textarea
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-6">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setEditingTx(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                disabled={isUpdating || editAmount <= 0}
+                onClick={handleSaveEdit}
+              >
+                {isUpdating ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardShell>
   );
 }

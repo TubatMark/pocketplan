@@ -1,46 +1,14 @@
 "use client";
 
-import { useState } from "react";
-// import { useMutation } from "convex/react";
-// import { api } from "@/convex/_generated/api";
-// import { useUserKey } from "@/lib/session";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { Mail, MapPin, Briefcase, Github, Linkedin, Globe } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 export default function AboutDeveloperPage() {
   const { toast } = useToast();
-  // const userKey = useUserKey();
-  // const sendMessage = useMutation(api.messages.sendMessage);
-
-  // const [name, setName] = useState("");
-  // const [email, setEmail] = useState("");
-  // const [message, setMessage] = useState("");
-  // const [isSending, setIsSending] = useState(false);
-
-  // const handleSubmit = (e: React.FormEvent) => {
-  //   e.preventDefault();
-  //   if (!message.trim()) return;
-
-  //   const subject = encodeURIComponent(`Contact Form: ${name} (${email})`);
-  //   const body = encodeURIComponent(message);
-    
-  //   // Open default mail client
-  //   window.location.href = `mailto:tubat.mark09@gmail.com?subject=${subject}&body=${body}`;
-
-  //   toast({
-  //     title: "Opening Email Client",
-  //     description: "Redirecting you to your email application to send the message.",
-  //   });
-
-  //   // Reset form
-  //   setName("");
-  //   setEmail("");
-  //   setMessage("");
-  // };
 
   return (
     <DashboardShell>

@@ -31,15 +31,19 @@ export const getGoalContext = query({
 });
 
 export const savePlan = mutation({
-  args: { 
-    userKey: v.string(), 
-    goalId: v.id("goals"), 
-    title: v.string(), 
-    content: v.string() 
+  args: {
+    userKey: v.string(),
+    goalId: v.id("goals"),
+    title: v.string(),
+    content: v.string()
   },
   handler: async (ctx: any, args: any) => {
     const user = await getUserFromToken(ctx, args.userKey);
     if (!user) throw new Error("Unauthorized");
+
+    // Verify goal ownership
+    const goal = await ctx.db.get(args.goalId);
+    if (!goal || goal.user_id !== user._id) throw new Error("Goal not found");
 
     // Check if plan exists for this goal
     const existing = await ctx.db
@@ -74,6 +78,10 @@ export const getPlan = query({
   handler: async (ctx: any, args: any) => {
     const user = await getUserFromToken(ctx, args.userKey);
     if (!user) return null;
+
+    // Verify goal ownership
+    const goal = await ctx.db.get(args.goalId);
+    if (!goal || goal.user_id !== user._id) return null;
 
     return await ctx.db
       .query("plans")
@@ -121,31 +129,39 @@ export const generate = action({
       throw new Error("GROK_API_KEY is not defined");
     }
 
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${GROK_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "openai/gpt-oss-120b",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: "Generate my financial plan." }
-        ],
-        temperature: 1,
-        max_tokens: 8192,
-        top_p: 1,
-      }),
-    });
+    let planContent: string;
+    try {
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${GROK_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-oss-120b",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: "Generate my financial plan." }
+          ],
+          temperature: 1,
+          max_tokens: 8192,
+          top_p: 1,
+        }),
+      });
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`Groq API Error: ${response.status} ${response.statusText} - ${errorBody}`);
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`Groq API Error: ${response.status} ${response.statusText} - ${errorBody}`);
+      }
+
+      const json = await response.json();
+      if (!json.choices || !Array.isArray(json.choices) || !json.choices[0]?.message?.content) {
+        throw new Error("Unexpected API response format");
+      }
+      planContent = json.choices[0].message.content;
+    } catch (error: any) {
+      throw new Error(`Failed to generate plan: ${error.message}`);
     }
-
-    const json = await response.json();
-    const planContent = json.choices[0]?.message?.content || "Failed to generate plan.";
 
     // 4. Save Plan
     await ctx.runMutation("plans:savePlan" as any, {

@@ -1,14 +1,26 @@
 "use client";
+import { useEffect, useCallback } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface MetricExplainerProps {
   isOpen: boolean;
   onClose: () => void;
-  type: "balance" | "spending" | "portfolio" | "investment" | null;
+  type: "balance" | "spending" | "portfolio" | "investment" | "expensePerDay" | null;
 }
 
 export function MetricExplainer({ isOpen, onClose, type }: MetricExplainerProps) {
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === "Escape") onClose();
+  }, [onClose]);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.addEventListener("keydown", handleKeyDown);
+      return () => document.removeEventListener("keydown", handleKeyDown);
+    }
+  }, [isOpen, handleKeyDown]);
+
   if (!isOpen || !type) return null;
 
   const content = {
@@ -21,20 +33,24 @@ export function MetricExplainer({ isOpen, onClose, type }: MetricExplainerProps)
       description: "This tracks your total expenses for the current month. Keeping this number lower than your income is key to saving money. The trend indicator shows how your spending compares to last month."
     },
     portfolio: {
-      title: "Portfolio Value",
-      description: "Your portfolio is a projection of your total financial health, including your current balance and estimated assets. In this system, it is currently calculated as 1.5x your balance to simulate asset value."
+      title: "Monthly Income",
+      description: "This shows your total income for the current month from all sources. The trend indicator shows how your income compares to last month."
     },
     investment: {
-      title: "Investment Potential",
-      description: "This is the portion of your wealth that could be allocated to long-term growth. Currently calculated as 30% of your balance, it represents money you might consider moving into higher-yield vehicles."
+      title: "Net Savings",
+      description: "This is the difference between your income and expenses for the current month. A positive number means you're saving money, while a negative number means you're spending more than you earn."
+    },
+    expensePerDay: {
+      title: "Expense Per Day",
+      description: "Your average daily spending for the current month, calculated by dividing total expenses by the number of days elapsed. Use this to track if your daily spending is sustainable within your budget."
     }
   };
 
   const info = content[type];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
-      <div className="relative w-full max-w-lg rounded-lg border bg-white p-6 shadow-lg">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" role="dialog" aria-modal="true" aria-label={info.title} onClick={onClose}>
+      <div className="relative w-full max-w-lg rounded-lg border bg-white p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
         <button 
           onClick={onClose}
           className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"

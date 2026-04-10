@@ -121,17 +121,18 @@ export const dashboard = query({
   args: { userKey: v.string() },
   handler: async (ctx: any, args: any) => {
     const user = await getUserFromToken(ctx, args.userKey);
-    if (!user) return { 
-      totalBalance: 0, 
-      monthIncome: 0, 
-      monthExpense: 0, 
-      monthNet: 0, 
-      trends: { balance: 0, income: 0, expense: 0, net: 0 },
-      wallets: [], 
-      goalProgress: [], 
+    if (!user) return {
+      totalBalance: 0,
+      monthIncome: 0,
+      monthExpense: 0,
+      monthNet: 0,
+      expensePerDay: 0,
+      trends: { balance: 0, income: 0, expense: 0, net: 0, expensePerDay: 0 },
+      wallets: [],
+      goalProgress: [],
       spendingByCategory: [],
       spendingHistory: [],
-      warnings: { overspending: false, goalAchieved: false, aheadOfSchedule: false, behindSchedule: false } 
+      warnings: { overspending: false, goalAchieved: false, aheadOfSchedule: false, behindSchedule: false }
     };
 
     const wallets = await ctx.db.query("wallets").withIndex("by_user", (q: any) => q.eq("user_id", user._id)).collect();
@@ -161,8 +162,15 @@ export const dashboard = query({
     const transferVolume = currentRange.filter((t: any) => t.type === "transfer").reduce((a: number, b: any) => a + b.amount, 0);
     const net = income - expense;
 
+    // Expense per day (current month)
+    const daysElapsed = Math.max(1, now.getDate()); // day of month (1-31)
+    const expensePerDay = Math.round((expense / daysElapsed) * 100) / 100;
+
+    // Previous month expense per day
+    const prevDaysInMonth = new Date(prevYear, prevMonth + 1, 0).getDate();
     const prevIncome = prevRange.filter((t: any) => t.type === "income").reduce((a: number, b: any) => a + b.amount, 0);
     const prevExpense = prevRange.filter((t: any) => t.type === "expense").reduce((a: number, b: any) => a + b.amount, 0);
+    const prevExpensePerDay = prevDaysInMonth > 0 ? prevExpense / prevDaysInMonth : 0;
     const prevNet = prevIncome - prevExpense;
 
     // Spending by Category (Current Month)
@@ -283,20 +291,24 @@ export const dashboard = query({
       behindSchedule,
     };
 
-    return { 
-      totalBalance, 
-      monthIncome: income, 
-      monthExpense: expense, 
+    return {
+      totalBalance,
+      monthIncome: income,
+      monthExpense: expense,
       monthTransferVolume: transferVolume,
-      monthNet: net, 
-      trends,
-      wallets, 
-      goalProgress, 
+      monthNet: net,
+      expensePerDay,
+      trends: {
+        ...trends,
+        expensePerDay: calcTrend(expensePerDay, prevExpensePerDay),
+      },
+      wallets,
+      goalProgress,
       spendingByCategory,
       spendingHistory,
       incomeHistory,
       transferHistory,
-      warnings 
+      warnings
     };
   },
 });

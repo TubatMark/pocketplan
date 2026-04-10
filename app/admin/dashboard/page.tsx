@@ -48,7 +48,7 @@ export default function AdminDashboardPage() {
         <p className="text-muted-foreground text-sm sm:text-base">Overview of system performance and user statistics.</p>
       </div>
 
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-2 md:grid-cols-4">
         {metrics.map((metric, index) => {
           const Icon = metric.icon;
           return (
@@ -77,9 +77,10 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent className="pl-2">
              <div className="h-[160px] sm:h-[180px] md:h-[200px] flex items-center justify-center text-gray-400 border border-dashed rounded-lg">
-                <div className="text-center">
-                  <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Chart Placeholder</p>
+                <div className="text-center space-y-2">
+                  <Users className="h-8 w-8 mx-auto opacity-50" />
+                  <p className="text-sm font-medium">{stats?.totalUsers ?? 0} total users</p>
+                  <p className="text-xs">{stats?.activeUsers ?? 0} active in last 30 days</p>
                 </div>
              </div>
           </CardContent>

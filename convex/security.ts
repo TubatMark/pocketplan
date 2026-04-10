@@ -86,16 +86,37 @@ export const logSuspiciousActivity = mutation({
 });
 
 export const verifyCaptcha = mutation({
-  args: { 
-    identifier: v.string(), 
-    token: v.string() 
+  args: {
+    identifier: v.string(),
+    token: v.string()
   },
   handler: async (ctx: any, args: any) => {
-    // In a real production environment, verify the token with Google/Cloudflare API
-    // const isValid = await verifyWithGoogle(args.token);
-    
-    // For this implementation using test keys, we assume valid if token is present
-    const isValid = !!args.token;
+    // Validate CAPTCHA token format - must be non-empty and reasonable length
+    if (!args.token || args.token.length < 20 || args.token.length > 4096) {
+      return { success: false };
+    }
+
+    // Verify with Google reCAPTCHA API
+    // Falls back to token-present check only if secret key is not configured
+    let isValid = false;
+    const secretKey = process.env.RECAPTCHA_SECRET_KEY;
+    if (secretKey) {
+      try {
+        const response = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `secret=${encodeURIComponent(secretKey)}&response=${encodeURIComponent(args.token)}`,
+        });
+        const data = await response.json();
+        isValid = data.success === true;
+      } catch {
+        // If verification service is down, deny by default
+        isValid = false;
+      }
+    } else {
+      // Development fallback: accept test key tokens
+      isValid = !!args.token;
+    }
 
     if (isValid) {
       // Unblock user

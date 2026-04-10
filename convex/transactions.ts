@@ -20,6 +20,12 @@ export const log = mutation({
     const user = await getUserFromToken(ctx, args.userKey);
     if (!user) throw new Error("Unauthorized");
 
+    // Server-side validation
+    if (args.amount <= 0 || args.amount > 999999999) throw new Error("Amount must be between 1 and 999,999,999");
+    if (!Number.isFinite(args.amount)) throw new Error("Invalid amount");
+    if (args.category && args.category.length > 100) throw new Error("Category too long");
+    if (args.notes && args.notes.length > 1000) throw new Error("Notes too long");
+
     const now = args.timestamp ?? Date.now();
 
     if (args.type === "savings" && !args.goal_id) {
@@ -91,6 +97,83 @@ export const log = mutation({
       amount: args.amount,
       related_id: wallet._id,
       created_at: now,
+    });
+  },
+});
+
+export const update = mutation({
+  args: {
+    userKey: v.string(),
+    transactionId: v.id("transactions"),
+    amount: v.optional(v.number()),
+    category: v.optional(v.string()),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx: any, args: any) => {
+    const user = await getUserFromToken(ctx, args.userKey);
+    if (!user) throw new Error("Unauthorized");
+
+    const tx = await ctx.db.get(args.transactionId);
+    if (!tx || tx.user_id !== user._id) throw new Error("Transaction not found");
+
+    // Validation
+    if (args.amount !== undefined) {
+      if (args.amount <= 0 || args.amount > 999999999) throw new Error("Amount must be between 1 and 999,999,999");
+      if (!Number.isFinite(args.amount)) throw new Error("Invalid amount");
+    }
+    if (args.category !== undefined && args.category.length > 100) throw new Error("Category too long");
+    if (args.notes !== undefined && args.notes.length > 1000) throw new Error("Notes too long");
+
+    const newAmount = args.amount ?? tx.amount;
+    const amountDiff = newAmount - tx.amount;
+
+    // If amount changed, reverse old wallet effect and apply new one
+    if (amountDiff !== 0) {
+      if (tx.type === "transfer") {
+        // For transfers, adjust both wallets
+        if (tx.transfer_from_wallet_id) {
+          const from = await ctx.db.get(tx.transfer_from_wallet_id);
+          if (from) {
+            const newFromBalance = from.balance + tx.amount - newAmount; // reverse old, apply new
+            if (newFromBalance < 0) throw new Error("Insufficient funds in source wallet after edit");
+            await ctx.db.patch(from._id, { balance: newFromBalance });
+          }
+        }
+        if (tx.transfer_to_wallet_id) {
+          const to = await ctx.db.get(tx.transfer_to_wallet_id);
+          if (to) {
+            await ctx.db.patch(to._id, { balance: to.balance - tx.amount + newAmount });
+          }
+        }
+      } else if (tx.wallet_id) {
+        const wallet = await ctx.db.get(tx.wallet_id);
+        if (wallet) {
+          // Reverse old effect, apply new
+          const oldDelta = tx.type === "income" ? tx.amount : -tx.amount;
+          const newDelta = tx.type === "income" ? newAmount : -newAmount;
+          const newBalance = wallet.balance - oldDelta + newDelta;
+          if (newBalance < 0) throw new Error("Insufficient funds in wallet after edit");
+          await ctx.db.patch(wallet._id, { balance: newBalance });
+        }
+      }
+    }
+
+    // Apply updates
+    const updates: Record<string, any> = {};
+    if (args.amount !== undefined) updates.amount = newAmount;
+    if (args.category !== undefined) updates.category = args.category;
+    if (args.notes !== undefined) updates.notes = args.notes;
+
+    await ctx.db.patch(args.transactionId, updates);
+
+    // Log activity
+    await ctx.db.insert("activities", {
+      user_id: user._id,
+      type: "transaction_edit",
+      description: `Edited ${tx.type}: ${args.category ?? tx.category}${amountDiff !== 0 ? ` (₱${tx.amount} → ₱${newAmount})` : ""}`,
+      amount: newAmount,
+      related_id: args.transactionId,
+      created_at: Date.now(),
     });
   },
 });

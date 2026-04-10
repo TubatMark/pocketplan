@@ -23,14 +23,15 @@ export default function DashboardPage() {
   const { data: stats, isLoading: isStatsLoading } = useData<any>("analytics:dashboard" as any, { userKey } as any);
   const { data: activities, isLoading: isActivitiesLoading } = useData<any[]>("activities:list" as any, { userKey } as any);
 
-  const [metricType, setMetricType] = useState<"balance" | "spending" | "portfolio" | "investment" | null>(null);
+  const [metricType, setMetricType] = useState<"balance" | "spending" | "portfolio" | "investment" | "expensePerDay" | null>(null);
   const [activeChart, setActiveChart] = useState<"spending" | "income" | "transfer" | "balance">("spending");
 
   const balance = stats?.totalBalance ?? 0;
   const monthExpense = stats?.monthExpense ?? 0;
   const monthIncome = stats?.monthIncome ?? 0;
   const monthTransferVolume = stats?.monthTransferVolume ?? 0;
-  const trends = stats?.trends ?? { balance: 0, income: 0, expense: 0, net: 0 };
+  const expensePerDay = stats?.expensePerDay ?? 0;
+  const trends = stats?.trends ?? { balance: 0, income: 0, expense: 0, net: 0, expensePerDay: 0 };
   const spendingByCategory = stats?.spendingByCategory ?? [];
   const spendingHistory = stats?.spendingHistory ?? [];
   const incomeHistory = stats?.incomeHistory ?? [];
@@ -42,9 +43,16 @@ export default function DashboardPage() {
     { userKey, period: "daily", walletId: "all" } as any
   );
 
+  const netSavings = monthIncome - monthExpense;
+
   const formatTrend = (val: number) => {
     const abs = Math.abs(val).toFixed(1);
-    return `${val >= 0 ? "+" : "-"}${abs}% then last month`;
+    return `${val >= 0 ? "+" : "-"}${abs}% from last month`;
+  };
+
+  const formatCurrency = (val: number) => {
+    if (val < 0) return `-₱${Math.abs(val).toLocaleString()}`;
+    return `₱${val.toLocaleString()}`;
   };
 
   const getCategoryStyle = (label: string) => {
@@ -69,10 +77,11 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8">
         {/* Left Column (Metrics + Recent Transactions) */}
         <div className="col-span-1 md:col-span-12 xl:col-span-5 flex flex-col gap-6 md:gap-8">
-          {/* 4 Metric Cards Grid */}
+          {/* Metric Cards Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {isStatsLoading ? (
               <>
+                <MetricCardSkeleton />
                 <MetricCardSkeleton />
                 <MetricCardSkeleton />
                 <MetricCardSkeleton />
@@ -82,7 +91,7 @@ export default function DashboardPage() {
               <>
                 <MetricCard
                   label="Balance"
-                  value={`₱${balance.toLocaleString()}`}
+                  value={formatCurrency(balance)}
                   subtext={formatTrend(trends.balance)}
                   trend={trends.balance >= 0 ? "up" : "down"}
                   colorVar="--card-orange"
@@ -90,27 +99,35 @@ export default function DashboardPage() {
                 />
                 <MetricCard
                   label="Spending"
-                  value={`₱${monthExpense.toLocaleString()}`}
+                  value={formatCurrency(monthExpense)}
                   subtext={formatTrend(trends.expense)}
-                  trend={trends.expense >= 0 ? "up" : "down"}
+                  trend={trends.expense <= 0 ? "up" : "down"}
                   colorVar="--card-green"
                   onClick={() => setMetricType("spending")}
                 />
                 <MetricCard
-                  label="Portfolio"
-                  value={`₱${(balance * 1.5).toLocaleString()}`} // Mocked portfolio
-                  subtext={formatTrend(trends.net)} // Using Net Savings trend as proxy
-                  trend={trends.net >= 0 ? "up" : "down"}
+                  label="Income"
+                  value={formatCurrency(monthIncome)}
+                  subtext={formatTrend(trends.income)}
+                  trend={trends.income >= 0 ? "up" : "down"}
                   colorVar="--card-purple"
                   onClick={() => setMetricType("portfolio")}
                 />
                 <MetricCard
-                  label="Investment"
-                  value={`₱${(balance * 0.3).toLocaleString()}`} // Mocked investment
-                  subtext={formatTrend(trends.income)} // Using Income trend as proxy
-                  trend={trends.income >= 0 ? "up" : "down"}
+                  label="Net Savings"
+                  value={formatCurrency(netSavings)}
+                  subtext={formatTrend(trends.net)}
+                  trend={netSavings >= 0 ? "up" : "down"}
                   colorVar="--card-blue"
                   onClick={() => setMetricType("investment")}
+                />
+                <MetricCard
+                  label="Expense / Day"
+                  value={formatCurrency(expensePerDay)}
+                  subtext={formatTrend(trends.expensePerDay ?? 0)}
+                  trend={(trends.expensePerDay ?? 0) <= 0 ? "up" : "down"}
+                  colorVar="--card-rose"
+                  onClick={() => setMetricType("expensePerDay")}
                 />
               </>
             )}
@@ -138,34 +155,42 @@ export default function DashboardPage() {
         <div className="col-span-1 md:col-span-12 xl:col-span-7 flex flex-col gap-6 md:gap-8">
           {/* Main Chart */}
           <div>
-            <div className="mb-4 flex items-center gap-2 md:gap-4 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
+            <div className="mb-4 flex items-center gap-2 md:gap-4 overflow-x-auto pb-2 md:pb-0" role="tablist" aria-label="Chart type">
               <button
+                role="tab"
+                aria-selected={activeChart === "spending"}
                 onClick={() => setActiveChart("spending")}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap ${
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 ${
                   activeChart === "spending" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
               >
                 Spending
               </button>
               <button
+                role="tab"
+                aria-selected={activeChart === "income"}
                 onClick={() => setActiveChart("income")}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap ${
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 ${
                   activeChart === "income" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
                 }`}
               >
                 Income
               </button>
               <button
+                role="tab"
+                aria-selected={activeChart === "transfer"}
                 onClick={() => setActiveChart("transfer")}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap ${
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
                   activeChart === "transfer" ? "bg-blue-600 text-white" : "bg-blue-50 text-blue-700 hover:bg-blue-100"
                 }`}
               >
                 Transfers
               </button>
               <button
+                role="tab"
+                aria-selected={activeChart === "balance"}
                 onClick={() => setActiveChart("balance")}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap ${
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
                   activeChart === "balance" ? "bg-indigo-600 text-white" : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
                 }`}
               >

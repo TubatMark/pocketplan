@@ -27,10 +27,10 @@ export function GoalDetailsDialog({ goal, progressData, isOpen, onClose, onUpdat
   const [months, setMonths] = useState(1);
 
   // Fetch transactions for this goal
-  const { data: transactions, isLoading: isTransactionsLoading } = useData<any[]>("transactions:listByGoal" as any, { 
-    userKey, 
-    goalId: goal?._id 
-  } as any);
+  const { data: transactions, isLoading: isTransactionsLoading } = useData<any[]>("transactions:listByGoal" as any, {
+    userKey,
+    goalId: goal?._id
+  } as any, { skip: !goal });
 
   useEffect(() => {
     if (goal) {

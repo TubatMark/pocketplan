@@ -6,7 +6,7 @@ import { useUserKey } from "@/lib/session";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 function SettingsContent() {
@@ -65,9 +65,13 @@ function SettingsContent() {
                   </div>
                 </div>
 
-                <Button 
+                <Button
                   onClick={async () => {
-                    await updateProfile({ userKey, name, email });
+                    try {
+                      await updateProfile({ userKey, name, email });
+                    } catch (err: any) {
+                      alert(err.message || "Failed to update profile");
+                    }
                   }}
                 >
                   Save Changes

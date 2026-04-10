@@ -3,16 +3,19 @@ import { v } from "convex/values";
 import { getUserFromToken } from "./auth";
 
 function computeRequired(target_amount: number, target_months: number, start_date?: number) {
+  const WEEKS_PER_MONTH = 4.34524; // 52.1429 weeks / 12 months
+  const DAYS_PER_MONTH = 30.4369; // 365.2425 days / 12 months
+
   const monthly = target_amount / target_months;
-  const weekly = target_amount / (target_months * 4.345); // average weeks per month
-  const daily = target_amount / (target_months * 30.437); // average days per month
+  const weekly = target_amount / (target_months * WEEKS_PER_MONTH);
+  const daily = target_amount / (target_months * DAYS_PER_MONTH);
   const start = start_date ?? Date.now();
   const deadline = new Date(start);
   deadline.setMonth(deadline.getMonth() + target_months);
   return {
-    required_monthly_savings: monthly,
-    required_weekly_savings: weekly,
-    required_daily_savings: daily,
+    required_monthly_savings: Math.round(monthly * 100) / 100,
+    required_weekly_savings: Math.round(weekly * 100) / 100,
+    required_daily_savings: Math.round(daily * 100) / 100,
     deadline: deadline.getTime(),
   };
 }
@@ -28,6 +31,13 @@ export const create = mutation({
   handler: async (ctx: any, args: any) => {
     const user = await getUserFromToken(ctx, args.userKey);
     if (!user) throw new Error("Unauthorized");
+
+    // Server-side validation
+    if (!args.slug || args.slug.trim().length === 0) throw new Error("Goal name is required");
+    if (args.slug.length > 200) throw new Error("Goal name too long");
+    if (args.target_amount <= 0 || args.target_amount > 999999999) throw new Error("Target amount must be between 1 and 999,999,999");
+    if (args.target_months <= 0 || args.target_months > 1200) throw new Error("Target months must be between 1 and 1200");
+
     const calc = computeRequired(args.target_amount, args.target_months, args.start_date);
     const id = await ctx.db.insert("goals", {
       user_id: user._id,
@@ -104,6 +114,25 @@ export const remove = mutation({
     if (!goal) throw new Error("Not found");
     const user = await getUserFromToken(ctx, args.userKey);
     if (!user || goal.user_id !== user._id) throw new Error("Forbidden");
+
+    // Clean up associated plans
+    const plans = await ctx.db.query("plans")
+      .withIndex("by_goal", (q: any) => q.eq("goal_id", args.goalId))
+      .collect();
+    for (const plan of plans) {
+      await ctx.db.delete(plan._id);
+    }
+
+    // Unlink transactions from this goal
+    const txs = await ctx.db.query("transactions")
+      .withIndex("by_user", (q: any) => q.eq("user_id", user._id))
+      .collect();
+    for (const tx of txs) {
+      if (tx.goal_id === args.goalId) {
+        await ctx.db.patch(tx._id, { goal_id: undefined });
+      }
+    }
+
     await ctx.db.delete(args.goalId);
 
     // Log activity

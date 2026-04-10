@@ -1,5 +1,5 @@
 "use client";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -14,19 +14,23 @@ interface MetricCardProps {
 }
 
 export function MetricCard({ label, value, subtext, trend, colorVar, onClick }: MetricCardProps) {
+  const TrendIcon = trend === "down" ? ArrowDownRight : ArrowUpRight;
   return (
-    <Card 
+    <Card
       className={cn("border-none shadow-sm transition-shadow hover:shadow-md", onClick && "cursor-pointer")}
       onClick={onClick}
     >
-      <CardContent 
+      <CardContent
         className="p-6 rounded-2xl"
         style={{ backgroundColor: `hsl(var(${colorVar}))` }}
       >
         <div className="flex items-start justify-between">
           <div className="text-sm font-medium text-gray-600">{label}</div>
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/50">
-            <ArrowUpRight className="h-4 w-4 text-gray-700" />
+          <div className={cn(
+            "flex h-8 w-8 items-center justify-center rounded-full",
+            trend === "down" ? "bg-red-100/50" : "bg-white/50"
+          )}>
+            <TrendIcon className={cn("h-4 w-4", trend === "down" ? "text-red-600" : "text-gray-700")} />
           </div>
         </div>
         <div className="mt-4">

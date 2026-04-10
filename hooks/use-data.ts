@@ -1,7 +1,7 @@
 "use client";
 
 import { useConvex } from "convex/react";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 
 interface UseDataOptions<T> {
   skip?: boolean;
@@ -19,8 +19,8 @@ interface UseDataResult<T> {
 }
 
 export function useData<T>(
-  query: any, 
-  args: any = {}, 
+  query: any,
+  args: any = {},
   options: UseDataOptions<T> = {}
 ): UseDataResult<T> {
   const convex = useConvex();
@@ -28,10 +28,15 @@ export function useData<T>(
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  
+
   // Use refs to avoid effect loops
   const optionsRef = useRef(options);
   optionsRef.current = options;
+
+  // Stable serialization of args to avoid unnecessary re-fetches
+  const stableArgsKey = useMemo(() => JSON.stringify(args), [args]);
+  const argsRef = useRef(args);
+  argsRef.current = args;
 
   const fetchData = useCallback(async (isBackground = false) => {
     if (optionsRef.current.skip) return;
@@ -43,7 +48,7 @@ export function useData<T>(
     }
 
     try {
-      const result = await convex.query(query, args);
+      const result = await convex.query(query, argsRef.current);
       setData(result);
       setStatus("success");
       setError(null);
@@ -54,13 +59,11 @@ export function useData<T>(
       setStatus("error");
       optionsRef.current.onError?.(errorObj);
     } finally {
-      if (!isBackground) {
-        // Keep "success" or "error" state
-      } else {
+      if (isBackground) {
         setIsRefreshing(false);
       }
     }
-  }, [convex, query, JSON.stringify(args)]);
+  }, [convex, query, stableArgsKey]);
 
   useEffect(() => {
     fetchData(false);

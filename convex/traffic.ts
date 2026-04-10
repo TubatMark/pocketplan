@@ -141,7 +141,14 @@ export const getSources = query({
 
     const counts: Record<string, number> = {};
     logs.forEach(l => {
-      const source = l.referrer ? new URL(l.referrer).hostname : "Direct";
+      let source = "Direct";
+      if (l.referrer) {
+        try {
+          source = new URL(l.referrer).hostname;
+        } catch {
+          source = "Unknown";
+        }
+      }
       counts[source] = (counts[source] || 0) + 1;
     });
 
@@ -153,7 +160,10 @@ export const getSources = query({
 
 export const getLogs = query({
   args: {
-    paginationOpts: v.any(),
+    paginationOpts: v.object({
+      numItems: v.number(),
+      cursor: v.union(v.string(), v.null()),
+    }),
   },
   handler: async (ctx, args) => {
     return await ctx.db.query("traffic_logs")
