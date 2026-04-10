@@ -162,15 +162,23 @@ export const dashboard = query({
     const transferVolume = currentRange.filter((t: any) => t.type === "transfer").reduce((a: number, b: any) => a + b.amount, 0);
     const net = income - expense;
 
-    // Expense per day (current month)
-    const daysElapsed = Math.max(1, now.getDate()); // day of month (1-31)
-    const expensePerDay = Math.round((expense / daysElapsed) * 100) / 100;
+    // Today's total expenses
+    const todayStart = new Date(currentYear, currentMonth, now.getDate()).getTime();
+    const todayEnd = new Date(currentYear, currentMonth, now.getDate(), 23, 59, 59, 999).getTime();
+    const expensePerDay = currentRange
+      .filter((t: any) => t.created_at >= todayStart && t.created_at <= todayEnd && (t.type === "expense" || t.type === "savings" || t.type === "debt_payment"))
+      .reduce((a: number, b: any) => a + b.amount, 0);
 
-    // Previous month expense per day
-    const prevDaysInMonth = new Date(prevYear, prevMonth + 1, 0).getDate();
+    // Yesterday's total expenses (for trend comparison)
+    const yesterdayDate = new Date(currentYear, currentMonth, now.getDate() - 1);
+    const yesterdayStart = new Date(yesterdayDate.getFullYear(), yesterdayDate.getMonth(), yesterdayDate.getDate()).getTime();
+    const yesterdayEnd = new Date(yesterdayDate.getFullYear(), yesterdayDate.getMonth(), yesterdayDate.getDate(), 23, 59, 59, 999).getTime();
+    const allTxs = [...currentRange, ...prevRange];
+    const prevExpensePerDay = allTxs
+      .filter((t: any) => t.created_at >= yesterdayStart && t.created_at <= yesterdayEnd && (t.type === "expense" || t.type === "savings" || t.type === "debt_payment"))
+      .reduce((a: number, b: any) => a + b.amount, 0);
     const prevIncome = prevRange.filter((t: any) => t.type === "income").reduce((a: number, b: any) => a + b.amount, 0);
     const prevExpense = prevRange.filter((t: any) => t.type === "expense" || t.type === "savings" || t.type === "debt_payment").reduce((a: number, b: any) => a + b.amount, 0);
-    const prevExpensePerDay = prevDaysInMonth > 0 ? prevExpense / prevDaysInMonth : 0;
     const prevNet = prevIncome - prevExpense;
 
     // Spending by Category (Current Month)

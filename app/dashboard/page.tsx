@@ -122,9 +122,9 @@ export default function DashboardPage() {
                   onClick={() => setMetricType("investment")}
                 />
                 <MetricCard
-                  label="Expense / Day"
+                  label="Today's Expense"
                   value={formatCurrency(expensePerDay)}
-                  subtext={formatTrend(trends.expensePerDay ?? 0)}
+                  subtext={`${(trends.expensePerDay ?? 0) >= 0 ? "+" : "-"}${Math.abs(trends.expensePerDay ?? 0).toFixed(1)}% vs yesterday`}
                   trend={(trends.expensePerDay ?? 0) <= 0 ? "up" : "down"}
                   colorVar="--card-rose"
                   onClick={() => setMetricType("expensePerDay")}
