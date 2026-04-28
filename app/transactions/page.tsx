@@ -1,589 +1,682 @@
 "use client";
+
 import { DashboardShell } from "@/components/dashboard-shell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
 import { useData } from "@/hooks/use-data";
 import { useAction as useActionHook } from "@/hooks/use-action";
-import { TransactionListSkeleton } from "@/components/skeletons";
-import { useState, useMemo, useCallback, useEffect } from "react";
 import { useUserKey } from "@/lib/session";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Search, Pencil, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  ArrowLeftRight,
+  CreditCard,
+  Pencil,
+  Search,
+  Trash2,
+  X,
+  Plus,
+  Sparkles,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import Link from "next/link";
 
-const ITEMS_PER_PAGE = 10;
+type Mode = "spend" | "earn" | "move";
+type Bucket = "expense" | "savings" | "others";
 
-const DEFAULT_CATEGORIES = [
-  "House Rent",
-  "Internet Bill",
-  "Mobile Bill",
-  "Electric Bill",
-  "Food",
-  "Wants",
-];
+const ITEMS_PER_PAGE = 12;
 
-function TransactionsContent() {
+function ymOf(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+function peso(n: number) {
+  return `₱${Math.round(n).toLocaleString()}`;
+}
+
+const BUCKET_LABEL: Record<Bucket, string> = {
+  expense: "Expense",
+  savings: "Savings",
+  others: "Others",
+};
+
+export default function TransactionsPage() {
   const userKey = useUserKey();
-  
-  // Data hooks
+
   const { data: wallets } = useData<any[]>("wallets:list" as any, { userKey } as any);
-  const { data: transactions, isLoading: isTransactionsLoading, refresh: refreshTransactions } = useData<any[]>("transactions:list" as any, { userKey } as any);
-  
-  // Action hooks
-  const { mutate: logTx, isLoading: isLogging } = useActionHook("transactions:log" as any, {
-    onSuccess: () => refreshTransactions()
-  });
-  const { mutate: updateTx, isLoading: isUpdating } = useActionHook("transactions:update" as any, {
-    onSuccess: () => { refreshTransactions(); setEditingTx(null); }
-  });
+  const { data: txs, refresh: refreshTxs } = useData<any[]>(
+    "transactions:list" as any,
+    { userKey } as any
+  );
+  const { data: budget } = useData<any>(
+    "budgets:get" as any,
+    { userKey, yearMonth: ymOf(new Date()) } as any
+  );
 
-  // Edit state
-  const [editingTx, setEditingTx] = useState<any>(null);
-  const [editAmount, setEditAmount] = useState(0);
-  const [editCategory, setEditCategory] = useState("");
-  const [editNotes, setEditNotes] = useState("");
+  const { mutate: logTx, isLoading: isLogging } = useActionHook(
+    "transactions:log" as any,
+    { onSuccess: () => refreshTxs() }
+  );
+  const { mutate: updateTx, isLoading: isUpdating } = useActionHook(
+    "transactions:update" as any,
+    { onSuccess: () => { refreshTxs(); setEditing(null); } }
+  );
+  const { mutate: deleteTx, isLoading: isDeleting } = useActionHook(
+    "transactions:remove" as any,
+    { onSuccess: () => refreshTxs() }
+  );
 
-  const openEdit = useCallback((tx: any) => {
-    setEditingTx(tx);
-    setEditAmount(tx.amount);
-    setEditCategory(tx.category || "");
-    setEditNotes(tx.notes || "");
-  }, []);
-
-  const handleSaveEdit = useCallback(async () => {
-    if (!editingTx || editAmount <= 0) return;
-    try {
-      await updateTx({
-        userKey,
-        transactionId: editingTx._id,
-        amount: editAmount,
-        category: editCategory,
-        notes: editNotes,
-      });
-    } catch (err: any) {
-      alert(err.message || "Failed to update transaction");
-    }
-  }, [editingTx, editAmount, editCategory, editNotes, userKey, updateTx]);
-
-  // Close edit dialog on Escape
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setEditingTx(null);
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, []);
-
-  const [type, setType] = useState("expense");
-  const [amount, setAmount] = useState(0);
-  
-  // Category State
-  const [categoryMode, setCategoryMode] = useState<"select" | "custom">("select");
-  const [selectedCategory, setSelectedCategory] = useState(DEFAULT_CATEGORIES[0]);
+  const [mode, setMode] = useState<Mode>("spend");
+  const [walletId, setWalletId] = useState<string>("");
+  const [fromWalletId, setFromWalletId] = useState<string>("");
+  const [toWalletId, setToWalletId] = useState<string>("");
+  const [categoryId, setCategoryId] = useState<string>("");
+  const [bucket, setBucket] = useState<Bucket>("expense");
   const [customCategory, setCustomCategory] = useState("");
-
-  const [walletId, setWalletId] = useState<string | null>(null);
-  const [fromWalletId, setFromWalletId] = useState<string | null>(null);
-  const [toWalletId, setToWalletId] = useState<string | null>(null);
-  const [goalId, setGoalId] = useState<string | null>(null);
-  const [method, setMethod] = useState("");
+  const [amount, setAmount] = useState<number>(0);
   const [notes, setNotes] = useState("");
+  const [editing, setEditing] = useState<any>(null);
 
-  const { data: goals } = useData<any[]>("goals:list" as any, { userKey } as any);
+  const categories: any[] = budget?.categories ?? [];
 
-  const finalCategory = (type === "transfer" || type === "income" || type === "savings") 
-    ? (type === "transfer" ? "Transfer" : (type === "savings" ? "Savings" : "Income")) 
-    : (categoryMode === "select" ? selectedCategory : customCategory);
+  // When budget changes, default the selected category
+  useEffect(() => {
+    if (categories.length > 0 && !categoryId) {
+      setCategoryId(categories[0]._id);
+      setBucket(categories[0].bucket);
+    }
+  }, [categories, categoryId]);
 
-  // Filter State
-  const [filterType, setFilterType] = useState<"all" | "income" | "expense" | "transfer" | "savings">("all");
-  const [dateRange, setDateRange] = useState<"all" | "today" | "week" | "month">("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  // Sync bucket with selected category
+  useEffect(() => {
+    const c = categories.find((c) => c._id === categoryId);
+    if (c) setBucket(c.bucket);
+  }, [categoryId, categories]);
+
+  const resetForm = () => {
+    setAmount(0);
+    setNotes("");
+    setCustomCategory("");
+  };
+
+  const handleSubmit = async () => {
+    if (amount <= 0) return;
+    try {
+      if (mode === "earn") {
+        if (!walletId) return alert("Pick a wallet");
+        await logTx({
+          userKey,
+          type: "income",
+          amount,
+          category: customCategory.trim() || "Income",
+          wallet_id: walletId as any,
+          notes,
+        });
+      } else if (mode === "move") {
+        if (!fromWalletId || !toWalletId) return alert("Pick both wallets");
+        if (fromWalletId === toWalletId) return alert("Wallets must differ");
+        await logTx({
+          userKey,
+          type: "transfer",
+          amount,
+          category: "Transfer",
+          transfer_from_wallet_id: fromWalletId as any,
+          transfer_to_wallet_id: toWalletId as any,
+          notes,
+        });
+      } else {
+        if (!walletId) return alert("Pick a wallet");
+        const cat = categories.find((c) => c._id === categoryId);
+        const finalCategory = cat?.name || customCategory.trim() || "Uncategorized";
+        await logTx({
+          userKey,
+          type: "expense",
+          amount,
+          category: finalCategory,
+          bucket: cat?.bucket ?? bucket,
+          category_id: cat?._id as any,
+          wallet_id: walletId as any,
+          notes,
+        });
+      }
+      resetForm();
+    } catch (err: any) {
+      alert(err.message || "Failed to log transaction");
+    }
+  };
+
+  // Filters
+  const [filterType, setFilterType] = useState<"all" | "income" | "expense" | "transfer" | "debt_payment">("all");
+  const [filterRange, setFilterRange] = useState<"all" | "today" | "week" | "month">("all");
   const [filterWallet, setFilterWallet] = useState<string>("all");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
-  // Filter Logic
-  const filteredTransactions = useMemo(() => {
-    if (!transactions) return [];
-
-    let filtered = [...transactions];
-
-    // Filter by Type
-    if (filterType !== "all") {
-      filtered = filtered.filter(t => t.type === filterType);
-    }
-
-    // Filter by Wallet
+  const filtered = useMemo(() => {
+    if (!txs) return [];
+    let out = [...txs];
+    if (filterType !== "all") out = out.filter((t) => t.type === filterType);
     if (filterWallet !== "all") {
-      filtered = filtered.filter(t => t.wallet_id === filterWallet || t.transfer_from_wallet_id === filterWallet || t.transfer_to_wallet_id === filterWallet);
+      out = out.filter(
+        (t) =>
+          t.wallet_id === filterWallet ||
+          t.transfer_from_wallet_id === filterWallet ||
+          t.transfer_to_wallet_id === filterWallet
+      );
     }
-
-    // Filter by Date
-    if (dateRange !== "all") {
+    if (filterRange !== "all") {
       const now = new Date();
-      const startOfDay = new Date(now.setHours(0, 0, 0, 0)).getTime();
-      const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())).setHours(0, 0, 0, 0);
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-
-      filtered = filtered.filter(t => {
-        if (dateRange === "today") return t.created_at >= startOfDay;
-        if (dateRange === "week") return t.created_at >= startOfWeek;
-        if (dateRange === "month") return t.created_at >= startOfMonth;
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay());
+      startOfWeek.setHours(0, 0, 0, 0);
+      const sw = startOfWeek.getTime();
+      const sm = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+      out = out.filter((t) => {
+        if (filterRange === "today") return t.created_at >= startOfDay;
+        if (filterRange === "week") return t.created_at >= sw;
+        if (filterRange === "month") return t.created_at >= sm;
         return true;
       });
     }
-
-    // Search Filter
-    if (searchQuery) {
-      const lowerQuery = searchQuery.toLowerCase();
-      filtered = filtered.filter(t => 
-        (t.notes && t.notes.toLowerCase().includes(lowerQuery)) ||
-        (t.category && t.category.toLowerCase().includes(lowerQuery)) ||
-        (t.amount.toString().includes(lowerQuery))
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      out = out.filter(
+        (t) =>
+          (t.notes && t.notes.toLowerCase().includes(q)) ||
+          (t.category && t.category.toLowerCase().includes(q)) ||
+          String(t.amount).includes(q)
       );
     }
+    return out.sort((a, b) => b.created_at - a.created_at);
+  }, [txs, filterType, filterWallet, filterRange, search]);
 
-    return filtered.sort((a, b) => b.created_at - a.created_at);
-  }, [transactions, filterType, dateRange, filterWallet, searchQuery]);
-
-  // Pagination Logic
-  const totalPages = Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE);
-  const paginatedTransactions = filteredTransactions.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
-
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      setCurrentPage(newPage);
-    }
-  };
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+  const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
   return (
     <DashboardShell>
       <div className="space-y-8">
-        <Card className="border-none shadow-sm">
-          <CardHeader>
-            <CardTitle>Log Transaction</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3 md:grid-cols-3">
-              <div>
-                <Label>Type</Label>
-                <Select value={type} onChange={(e) => setType(e.target.value)}>
-                  <option value="income">Income</option>
-                  <option value="expense">Expense</option>
-                  <option value="transfer">Transfer</option>
-                  <option value="savings">Savings</option>
+        {/* Header */}
+        <div>
+          <div className="text-xs font-medium uppercase tracking-[0.16em] text-gray-400">
+            Transactions
+          </div>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight md:text-3xl">
+            Log what you earn, spend, and move
+          </h1>
+        </div>
+
+        {/* Logger */}
+        <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-gray-100 md:p-6">
+          <div className="mb-4 flex items-center gap-1 rounded-full bg-gray-100 p-1 w-fit">
+            {(["spend", "earn", "move"] as Mode[]).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={cn(
+                  "rounded-full px-4 py-1.5 text-xs font-semibold capitalize transition-colors",
+                  mode === m
+                    ? "bg-gray-900 text-white shadow-sm"
+                    : "text-gray-600 hover:text-gray-900"
+                )}
+              >
+                {m === "spend" ? "Spend" : m === "earn" ? "Earn" : "Move"}
+              </button>
+            ))}
+          </div>
+
+          {mode === "spend" && (
+            <div className="grid gap-4 md:grid-cols-12">
+              <div className="md:col-span-3">
+                <Label className="text-xs">Wallet</Label>
+                <Select value={walletId} onChange={(e) => setWalletId(e.target.value)} className="mt-1">
+                  <option value="">Select wallet</option>
+                  {wallets?.map((w: any) => (
+                    <option key={w._id} value={w._id}>
+                      {w.name} · {peso(w.balance)}
+                    </option>
+                  ))}
                 </Select>
               </div>
-              <div>
-                <Label>Amount</Label>
-                <Input type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} />
-              </div>
-              <div>
-                <div className="flex items-center justify-between">
-                  <Label className={(type === "transfer" || type === "income" || type === "savings") ? "text-gray-400" : ""}>Category</Label>
-                  <button 
-                    onClick={() => setCategoryMode(prev => prev === "select" ? "custom" : "select")}
-                    className={`text-xs hover:underline ${(type === "transfer" || type === "income" || type === "savings") ? "text-gray-300 cursor-not-allowed no-underline" : "text-blue-600"}`}
-                    disabled={type === "transfer" || type === "income" || type === "savings"}
+              <div className="md:col-span-4">
+                <Label className="text-xs">Category</Label>
+                {categories.length > 0 ? (
+                  <Select
+                    value={categoryId}
+                    onChange={(e) => setCategoryId(e.target.value)}
+                    className="mt-1"
                   >
-                    {categoryMode === "select" ? "Enter custom" : "Select list"}
-                  </button>
-                </div>
-                {categoryMode === "select" ? (
-                  <Select 
-                    value={(type === "transfer" || type === "income" || type === "savings") ? (type === "transfer" ? "Transfer" : (type === "savings" ? "Savings" : "Income")) : selectedCategory} 
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    disabled={type === "transfer" || type === "income" || type === "savings"}
-                    className={(type === "transfer" || type === "income" || type === "savings") ? "bg-gray-100 text-gray-500" : ""}
-                  >
-                    {(type === "transfer" || type === "income" || type === "savings") ? (
-                       <option value={type === "transfer" ? "Transfer" : (type === "savings" ? "Savings" : "Income")}>{type === "transfer" ? "Transfer" : (type === "savings" ? "Savings" : "Income")}</option>
-                    ) : (
-                      DEFAULT_CATEGORIES.map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))
-                    )}
+                    {categories.map((c) => (
+                      <option key={c._id} value={c._id}>
+                        {c.name} · {BUCKET_LABEL[c.bucket as Bucket]}
+                      </option>
+                    ))}
                   </Select>
                 ) : (
-                  <Input 
-                    value={(type === "transfer" || type === "income" || type === "savings") ? (type === "transfer" ? "Transfer" : (type === "savings" ? "Savings" : "Income")) : customCategory} 
-                    onChange={(e) => setCustomCategory(e.target.value)} 
-                    placeholder="Enter category name" 
-                    disabled={type === "transfer" || type === "income" || type === "savings"}
-                    className={(type === "transfer" || type === "income" || type === "savings") ? "bg-gray-100 text-gray-500" : ""}
-                  />
+                  <div className="mt-1 flex items-stretch gap-2">
+                    <Select
+                      value={bucket}
+                      onChange={(e) => setBucket(e.target.value as Bucket)}
+                      className="w-32"
+                    >
+                      <option value="expense">Expense</option>
+                      <option value="savings">Savings</option>
+                      <option value="others">Others</option>
+                    </Select>
+                    <Input
+                      value={customCategory}
+                      onChange={(e) => setCustomCategory(e.target.value)}
+                      placeholder="Category name"
+                    />
+                  </div>
+                )}
+                {categories.length === 0 && (
+                  <Link
+                    href="/budget"
+                    className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-medium text-gray-500 hover:text-gray-900"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    Set up this month's budget for one-tap categories
+                  </Link>
                 )}
               </div>
-            </div>
-
-            {type !== "transfer" && (
-              <div className="mt-3 grid gap-3 md:grid-cols-3">
-                <div>
-                  <Label>Wallet</Label>
-                  <Select value={walletId ?? ""} onChange={(e) => setWalletId(e.target.value)}>
-                    <option value="">Select wallet</option>
-                    {wallets?.map((w: any) => (
-                      <option key={w._id} value={w._id}>{w.name}</option>
-                    ))}
-                  </Select>
-                </div>
-                {/* Method Removed - Auto determined */}
-                <div className="md:col-span-2">
-                  <Label>Notes</Label>
-                  <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
-                </div>
-                {/* Optional Goal Assignment */}
-                <div className="md:col-span-3 border-t pt-3 mt-2">
-                   <Label className="text-gray-500">Assign to Goal {type === "savings" ? "(Required)" : "(Optional)"}</Label>
-                   <Select value={goalId ?? ""} onChange={(e) => setGoalId(e.target.value || null)}>
-                     <option value="">None</option>
-                     {goals?.map((g: any) => (
-                       <option key={g._id} value={g._id}>{g.slug} (Target: ₱{g.target_amount.toLocaleString()})</option>
-                     ))}
-                   </Select>
-                   <p className="text-xs text-gray-400 mt-1">If selected, this amount will contribute towards the goal&apos;s progress.</p>
+              <div className="md:col-span-2">
+                <Label className="text-xs">Amount</Label>
+                <div className="mt-1 flex items-center rounded-md border border-input bg-background px-3 ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+                  <span className="text-sm text-gray-400">₱</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={amount || ""}
+                    onChange={(e) => setAmount(Number(e.target.value) || 0)}
+                    placeholder="0"
+                    className="h-10 w-full bg-transparent px-2 text-sm font-semibold tabular-nums focus:outline-none"
+                  />
                 </div>
               </div>
-            )}
+              <div className="md:col-span-3">
+                <Label className="text-xs">Remarks</Label>
+                <Input
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="optional"
+                  className="mt-1"
+                />
+              </div>
+            </div>
+          )}
 
-            {type === "transfer" && (
-              <div className="mt-3 grid gap-3 md:grid-cols-3">
-                <div>
-                  <Label>From Wallet</Label>
-                  <Select value={fromWalletId ?? ""} onChange={(e) => setFromWalletId(e.target.value)}>
-                    <option value="">Select wallet</option>
-                    {wallets?.map((w: any) => (
-                      <option key={w._id} value={w._id}>{w.name}</option>
-                    ))}
-                  </Select>
-                </div>
-                <div>
-                  <Label>To Wallet</Label>
-                  <Select value={toWalletId ?? ""} onChange={(e) => setToWalletId(e.target.value)}>
-                    <option value="">Select wallet</option>
-                    {wallets?.map((w: any) => (
-                      <option key={w._id} value={w._id}>{w.name}</option>
-                    ))}
-                  </Select>
-                </div>
-                <div className="md:col-span-1">
-                  <Label>Notes</Label>
-                  <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
-                </div>
-                {/* Optional Goal Assignment for Transfers */}
-                <div className="md:col-span-3 border-t pt-3 mt-2">
-                   <Label className="text-gray-500">Assign to Goal (Optional)</Label>
-                   <Select value={goalId ?? ""} onChange={(e) => setGoalId(e.target.value || null)}>
-                     <option value="">None</option>
-                     {goals?.map((g: any) => (
-                       <option key={g._id} value={g._id}>{g.slug} (Target: ₱{g.target_amount.toLocaleString()})</option>
-                     ))}
-                   </Select>
-                   <p className="text-xs text-gray-400 mt-1">Example: Transferring money to a savings wallet for this goal.</p>
+          {mode === "earn" && (
+            <div className="grid gap-4 md:grid-cols-12">
+              <div className="md:col-span-3">
+                <Label className="text-xs">Wallet</Label>
+                <Select value={walletId} onChange={(e) => setWalletId(e.target.value)} className="mt-1">
+                  <option value="">Select wallet</option>
+                  {wallets?.map((w: any) => (
+                    <option key={w._id} value={w._id}>
+                      {w.name} · {peso(w.balance)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="md:col-span-4">
+                <Label className="text-xs">Source</Label>
+                <Input
+                  value={customCategory}
+                  onChange={(e) => setCustomCategory(e.target.value)}
+                  placeholder="Salary, freelance, gift..."
+                  className="mt-1"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-xs">Amount</Label>
+                <div className="mt-1 flex items-center rounded-md border border-input bg-background px-3 ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+                  <span className="text-sm text-gray-400">₱</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={amount || ""}
+                    onChange={(e) => setAmount(Number(e.target.value) || 0)}
+                    placeholder="0"
+                    className="h-10 w-full bg-transparent px-2 text-sm font-semibold tabular-nums focus:outline-none"
+                  />
                 </div>
               </div>
-            )}
-
-            <div className="mt-4">
-              <Button
-                disabled={isLogging}
-                onClick={async () => {
-                  if (amount <= 0) return;
-                  if (type === "transfer") {
-                    if (!fromWalletId || !toWalletId) return;
-                    await logTx({ 
-                      userKey, 
-                      amount, 
-                      type: "transfer", 
-                      category: "Transfer", // Hardcode category for transfers
-                      transfer_from_wallet_id: fromWalletId as any, 
-                      transfer_to_wallet_id: toWalletId as any, 
-                      notes,
-                      goal_id: goalId ?? undefined // Pass goal ID
-                    });
-                  } else {
-                    if (!walletId) return;
-                    await logTx({ 
-                      userKey, 
-                      amount, 
-                      type: type as any, 
-                      category: finalCategory, 
-                      wallet_id: walletId as any, 
-                      method, 
-                      notes,
-                      goal_id: goalId ?? undefined // Pass goal ID
-                    });
-                  }
-                  setAmount(0);
-                  setCustomCategory("");
-                  setWalletId(null);
-                  setFromWalletId(null);
-                  setToWalletId(null);
-                  setGoalId(null);
-                  setMethod("");
-                  setNotes("");
-                }}
-              >
-                {isLogging ? "Adding..." : "Add Transaction"}
-              </Button>
+              <div className="md:col-span-3">
+                <Label className="text-xs">Remarks</Label>
+                <Input
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="optional"
+                  className="mt-1"
+                />
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          )}
 
-        <Card className="border-none shadow-sm">
-          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <CardTitle>Recent Transactions</CardTitle>
-            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-              <Select value={filterType} onChange={(e) => setFilterType(e.target.value as any)} className="w-full sm:w-[120px] h-9 sm:h-8 text-xs">
-                <option value="all">All Types</option>
-                <option value="income">Income</option>
-                <option value="expense">Expense</option>
-                <option value="transfer">Transfer</option>
-                <option value="savings">Savings</option>
+          {mode === "move" && (
+            <div className="grid gap-4 md:grid-cols-12">
+              <div className="md:col-span-3">
+                <Label className="text-xs">From</Label>
+                <Select value={fromWalletId} onChange={(e) => setFromWalletId(e.target.value)} className="mt-1">
+                  <option value="">From wallet</option>
+                  {wallets?.map((w: any) => (
+                    <option key={w._id} value={w._id}>
+                      {w.name} · {peso(w.balance)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="md:col-span-3">
+                <Label className="text-xs">To</Label>
+                <Select value={toWalletId} onChange={(e) => setToWalletId(e.target.value)} className="mt-1">
+                  <option value="">To wallet</option>
+                  {wallets?.map((w: any) => (
+                    <option key={w._id} value={w._id}>
+                      {w.name} · {peso(w.balance)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-xs">Amount</Label>
+                <div className="mt-1 flex items-center rounded-md border border-input bg-background px-3 ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+                  <span className="text-sm text-gray-400">₱</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={amount || ""}
+                    onChange={(e) => setAmount(Number(e.target.value) || 0)}
+                    placeholder="0"
+                    className="h-10 w-full bg-transparent px-2 text-sm font-semibold tabular-nums focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div className="md:col-span-4">
+                <Label className="text-xs">Remarks</Label>
+                <Input
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="optional"
+                  className="mt-1"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="mt-4 flex items-center justify-end">
+            <Button onClick={handleSubmit} disabled={isLogging || amount <= 0} className="gap-1.5">
+              <Plus className="h-4 w-4" />
+              {isLogging ? "Saving..." : "Log transaction"}
+            </Button>
+          </div>
+        </div>
+
+        {/* Filters + list */}
+        <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-gray-100 md:p-6">
+          <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">Recent</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search"
+                  className="w-44 pl-9"
+                />
+              </div>
+              <Select value={filterType} onChange={(e) => setFilterType(e.target.value as any)} className="h-10 w-32">
+                <option value="all">All types</option>
+                <option value="income">Earn</option>
+                <option value="expense">Spend</option>
+                <option value="transfer">Move</option>
+                <option value="debt_payment">Debt</option>
               </Select>
-              <Select value={dateRange} onChange={(e) => setDateRange(e.target.value as any)} className="w-full sm:w-[120px] h-9 sm:h-8 text-xs">
-                <option value="all">All Dates</option>
+              <Select value={filterRange} onChange={(e) => setFilterRange(e.target.value as any)} className="h-10 w-32">
+                <option value="all">All dates</option>
                 <option value="today">Today</option>
-                <option value="week">This Week</option>
-                <option value="month">This Month</option>
+                <option value="week">This week</option>
+                <option value="month">This month</option>
+              </Select>
+              <Select value={filterWallet} onChange={(e) => setFilterWallet(e.target.value)} className="h-10 w-36">
+                <option value="all">All wallets</option>
+                {wallets?.map((w: any) => (
+                  <option key={w._id} value={w._id}>{w.name}</option>
+                ))}
               </Select>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4">
-               <div className="relative">
-                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                 <Input
-                   placeholder="Search transactions..."
-                   value={searchQuery}
-                   onChange={(e) => setSearchQuery(e.target.value)}
-                   className="pl-9 h-10"
-                 />
-               </div>
-            </div>
+          </div>
 
-            {isTransactionsLoading ? (
-              <TransactionListSkeleton />
-            ) : (
-            <>
-            {/* Mobile Card View */}
-            <div className="sm:hidden space-y-3">
-              {(paginatedTransactions ?? []).map((t: any) => {
-                const walletName = wallets?.find(w => w._id === t.wallet_id)?.name ||
-                                 (t.type === 'transfer' ? 'Transfer' : 'Wallet');
+          {filtered.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center text-sm text-gray-400">
+              No transactions match.
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {paged.map((t) => {
+                const w = wallets?.find((w: any) => w._id === t.wallet_id);
+                const fromW = wallets?.find((w: any) => w._id === t.transfer_from_wallet_id);
+                const toW = wallets?.find((w: any) => w._id === t.transfer_to_wallet_id);
                 return (
-                  <div key={t._id} className="rounded-2xl bg-white border border-gray-100 p-4 shadow-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <Avatar className="h-10 w-10 shrink-0">
-                          <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${t.category}`} />
-                          <AvatarFallback>{t.category?.[0]}</AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0 flex-1">
-                          <span className="font-medium text-gray-900 block truncate">{t.category || "Transaction"}</span>
-                          {t.notes && <span className="text-xs text-gray-400 truncate block">{t.notes}</span>}
-                          <span className="text-xs text-gray-400 mt-1 block">{walletName}</span>
-                        </div>
+                  <div key={t._id} className="flex items-center gap-3 py-3">
+                    <TxIcon type={t.type} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-gray-900">
+                        {t.category || "Transaction"}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className={`text-right font-semibold ${
-                          t.type === 'income' ? 'text-green-600' :
-                          t.type === 'savings' ? 'text-emerald-600' :
-                          'text-gray-900'
-                        }`}>
-                          {t.type === 'income' ? '+' : ''}₱{t.amount.toLocaleString()}
-                        </div>
-                        <button onClick={() => openEdit(t)} className="p-1 text-gray-400 hover:text-gray-600 rounded" aria-label="Edit transaction">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
+                      <div className="truncate text-xs text-gray-400">
+                        {format(new Date(t.created_at), "MMM d, yyyy")} ·{" "}
+                        {t.type === "transfer"
+                          ? `${fromW?.name ?? "Wallet"} → ${toW?.name ?? "Wallet"}`
+                          : w?.name ?? "Wallet"}
+                        {t.notes ? ` · ${t.notes}` : ""}
                       </div>
                     </div>
-                    <div className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-50">
-                      {format(new Date(t.created_at), "MMM d, yyyy 'at' h:mm a")}
+                    <div className={cn("text-sm font-bold tabular-nums", txAmountClass(t.type))}>
+                      {txPrefix(t.type)}
+                      {peso(t.amount)}
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        onClick={() => setEditing(t)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                        aria-label="Edit"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm("Delete this transaction? Wallet balances will reverse.")) {
+                            deleteTx({ userKey, transactionId: t._id });
+                          }
+                        }}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-rose-50 hover:text-rose-600"
+                        aria-label="Delete"
+                        disabled={isDeleting}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   </div>
                 );
               })}
-              {(!paginatedTransactions || paginatedTransactions.length === 0) && (
-                <div className="rounded-2xl bg-gray-50 p-8 text-center text-sm text-gray-400">
-                  No transactions found
-                </div>
-              )}
             </div>
+          )}
 
-            {/* Desktop Table View */}
-            <div className="hidden sm:block rounded-3xl bg-white shadow-sm overflow-x-auto -mx-4 sm:mx-0">
-              <table className="w-full min-w-[600px]">
-                <thead className="border-b border-gray-50 bg-gray-50/50">
-                  <tr>
-                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Name</th>
-                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Wallet</th>
-                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Date</th>
-                    <th className="px-4 sm:px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Amount</th>
-                    <th className="px-4 sm:px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider w-16"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {(paginatedTransactions ?? []).map((t: any) => {
-                    const walletName = wallets?.find(w => w._id === t.wallet_id)?.name ||
-                                     (t.type === 'transfer' ? 'Transfer' : 'Wallet');
-                    return (
-                    <tr key={t._id} className="hover:bg-gray-50/50">
-                      <td className="px-4 sm:px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${t.category}`} />
-                            <AvatarFallback>{t.category?.[0]}</AvatarFallback>
-                          </Avatar>
-                          <div className="flex flex-col">
-                            <span className="font-medium text-gray-900">{t.category || "Transaction"}</span>
-                            {t.notes && <span className="text-xs text-gray-400 truncate max-w-[150px]">{t.notes}</span>}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-500">
-                        {walletName}
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-500">
-                        {format(new Date(t.created_at), "MMM d, yyyy")}
-                      </td>
-                      <td className={`px-4 sm:px-6 py-4 text-right font-semibold ${
-                        t.type === 'income' ? 'text-green-600' :
-                        t.type === 'savings' ? 'text-emerald-600' :
-                        'text-gray-900'
-                      }`}>
-                        {t.type === 'income' ? '+' : ''}₱{t.amount.toLocaleString()}
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 text-right">
-                        <button onClick={() => openEdit(t)} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors" aria-label="Edit transaction">
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  )})}
-                  {(!paginatedTransactions || paginatedTransactions.length === 0) && (
-                     <tr>
-                      <td colSpan={5} className="px-4 sm:px-6 py-8 text-center text-sm text-gray-400">
-                        No transactions found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination Controls */}
-            {filteredTransactions.length > ITEMS_PER_PAGE && (
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-t px-4 sm:px-6 py-4 mt-4">
-                <div className="text-sm text-muted-foreground text-center sm:text-left">
-                  Page {currentPage} of {totalPages}
-                </div>
-                <div className="flex items-center justify-center sm:justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    className="flex-1 sm:flex-none"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    <span className="hidden sm:inline">Previous</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                    className="flex-1 sm:flex-none"
-                  >
-                    <span className="hidden sm:inline">Next</span>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
+          {filtered.length > ITEMS_PER_PAGE && (
+            <div className="mt-4 flex items-center justify-between gap-2 border-t border-gray-50 pt-4">
+              <div className="text-xs text-gray-400">
+                Page {page} of {totalPages}
               </div>
-            )}
-            </>
-            )}
-          </CardContent>
-        </Card>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={page === 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={page === totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Edit Transaction Dialog */}
-      {editingTx && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" role="dialog" aria-modal="true" aria-label="Edit transaction" onClick={() => setEditingTx(null)}>
-          <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => setEditingTx(null)}
-              className="absolute right-4 top-4 p-1 rounded-sm opacity-70 hover:opacity-100 transition-opacity"
-              aria-label="Close"
-            >
-              <X className="h-4 w-4" />
-            </button>
-
-            <h2 className="text-lg font-semibold mb-1">Edit Transaction</h2>
-            <p className="text-sm text-gray-500 mb-5">
-              {editingTx.type.charAt(0).toUpperCase() + editingTx.type.slice(1)} &middot; {format(new Date(editingTx.created_at), "MMM d, yyyy")}
-            </p>
-
-            <div className="space-y-4">
-              <div>
-                <Label>Amount</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={editAmount}
-                  onChange={(e) => setEditAmount(Number(e.target.value))}
-                />
-              </div>
-              {editingTx.type !== "transfer" && (
-                <div>
-                  <Label>Category</Label>
-                  <Input
-                    value={editCategory}
-                    onChange={(e) => setEditCategory(e.target.value)}
-                  />
-                </div>
-              )}
-              <div>
-                <Label>Notes</Label>
-                <Textarea
-                  value={editNotes}
-                  onChange={(e) => setEditNotes(e.target.value)}
-                  rows={3}
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2 mt-6">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setEditingTx(null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                className="flex-1"
-                disabled={isUpdating || editAmount <= 0}
-                onClick={handleSaveEdit}
-              >
-                {isUpdating ? "Saving..." : "Save Changes"}
-              </Button>
-            </div>
-          </div>
-        </div>
+      {editing && (
+        <EditDialog
+          tx={editing}
+          isLoading={isUpdating}
+          onClose={() => setEditing(null)}
+          onSave={async (patch) => {
+            try {
+              await updateTx({
+                userKey,
+                transactionId: editing._id,
+                ...patch,
+              });
+            } catch (err: any) {
+              alert(err.message || "Failed to update");
+            }
+          }}
+        />
       )}
     </DashboardShell>
   );
 }
 
-export default function TransactionsPage() {
-  return <TransactionsContent />;
+function EditDialog({
+  tx,
+  isLoading,
+  onClose,
+  onSave,
+}: {
+  tx: any;
+  isLoading: boolean;
+  onClose: () => void;
+  onSave: (patch: { amount: number; category: string; notes: string }) => void;
+}) {
+  const [amount, setAmount] = useState(tx.amount);
+  const [category, setCategory] = useState(tx.category ?? "");
+  const [notes, setNotes] = useState(tx.notes ?? "");
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+              Edit
+            </div>
+            <h2 className="text-lg font-bold text-gray-900">{tx.category || "Transaction"}</h2>
+            <div className="text-xs text-gray-500">
+              {format(new Date(tx.created_at), "MMM d, yyyy 'at' h:mm a")}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <Label className="text-xs">Amount</Label>
+            <div className="mt-1 flex items-center rounded-md border border-input bg-background px-3 ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+              <span className="text-sm text-gray-400">₱</span>
+              <input
+                type="number"
+                value={amount || ""}
+                onChange={(e) => setAmount(Number(e.target.value) || 0)}
+                className="h-10 w-full bg-transparent px-2 text-sm font-semibold tabular-nums focus:outline-none"
+              />
+            </div>
+          </div>
+          {tx.type !== "transfer" && (
+            <div>
+              <Label className="text-xs">Category</Label>
+              <Input value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1" />
+            </div>
+          )}
+          <div>
+            <Label className="text-xs">Notes</Label>
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="mt-1" />
+          </div>
+        </div>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            disabled={isLoading || amount <= 0}
+            onClick={() => onSave({ amount, category, notes })}
+          >
+            {isLoading ? "Saving..." : "Save"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TxIcon({ type }: { type: string }) {
+  let bg = "bg-rose-50";
+  let color = "text-rose-600";
+  let Icon = ArrowDownRight;
+  if (type === "income") {
+    bg = "bg-emerald-50";
+    color = "text-emerald-600";
+    Icon = ArrowUpRight;
+  } else if (type === "transfer") {
+    bg = "bg-blue-50";
+    color = "text-blue-600";
+    Icon = ArrowLeftRight;
+  } else if (type === "debt_payment") {
+    bg = "bg-violet-50";
+    color = "text-violet-600";
+    Icon = CreditCard;
+  }
+  return (
+    <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", bg)}>
+      <Icon className={cn("h-4 w-4", color)} />
+    </div>
+  );
+}
+
+function txAmountClass(type: string) {
+  if (type === "income") return "text-emerald-600";
+  if (type === "transfer") return "text-blue-600";
+  if (type === "debt_payment") return "text-violet-600";
+  return "text-rose-600";
+}
+
+function txPrefix(type: string) {
+  if (type === "income") return "+";
+  if (type === "transfer") return "";
+  return "-";
 }

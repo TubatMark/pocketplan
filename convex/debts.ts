@@ -7,7 +7,6 @@ export const list = query({
   handler: async (ctx: any, args: any) => {
     const user = await getUserFromToken(ctx, args.userKey);
     if (!user) return [];
-    
     return await ctx.db
       .query("debts")
       .withIndex("by_user", (q: any) => q.eq("user_id", user._id))
@@ -24,45 +23,53 @@ export const create = mutation({
     interest_rate: v.optional(v.number()),
     due_date: v.optional(v.number()),
     notes: v.optional(v.string()),
-    walletId: v.optional(v.id("wallets")), // Optional: link to wallet deduction
+    walletId: v.optional(v.id("wallets")),
   },
   handler: async (ctx: any, args: any) => {
     const user = await getUserFromToken(ctx, args.userKey);
     if (!user) throw new Error("Unauthorized");
 
-    // Server-side validation
-    if (!args.name || args.name.trim().length === 0) throw new Error("Name is required");
+    if (!args.name || args.name.trim().length === 0)
+      throw new Error("Name is required");
     if (args.name.length > 200) throw new Error("Name too long");
-    if (args.total_amount <= 0 || args.total_amount > 999999999) throw new Error("Amount must be between 1 and 999,999,999");
-    if (args.interest_rate !== undefined && (args.interest_rate < 0 || args.interest_rate > 100)) throw new Error("Interest rate must be 0-100%");
-    if (args.notes && args.notes.length > 1000) throw new Error("Notes too long");
+    if (args.total_amount <= 0 || args.total_amount > 999999999)
+      throw new Error("Amount must be between 1 and 999,999,999");
+    if (
+      args.interest_rate !== undefined &&
+      (args.interest_rate < 0 || args.interest_rate > 100)
+    )
+      throw new Error("Interest rate must be 0-100%");
+    if (args.notes && args.notes.length > 1000)
+      throw new Error("Notes too long");
 
-    // 1. Handle Wallet Transaction (Optional)
     if (args.walletId) {
       const wallet = await ctx.db.get(args.walletId);
-      if (!wallet || wallet.user_id !== user._id) throw new Error("Wallet not found");
+      if (!wallet || wallet.user_id !== user._id)
+        throw new Error("Wallet not found");
 
       if (args.type === "owed_to_you") {
-        // Lending money: Expense (Deduct from wallet)
         if (wallet.balance < args.total_amount) {
-          throw new Error(`Insufficient funds in ${wallet.name}. Available: ₱${wallet.balance}`);
+          throw new Error(
+            `Insufficient funds in ${wallet.name}. Available: ₱${wallet.balance}`
+          );
         }
-        await ctx.db.patch(wallet._id, { balance: wallet.balance - args.total_amount });
-        
+        await ctx.db.patch(wallet._id, {
+          balance: wallet.balance - args.total_amount,
+        });
         await ctx.db.insert("transactions", {
           user_id: user._id,
           amount: args.total_amount,
           type: "expense",
           category: "Debt Creation",
+          bucket: "expense",
           wallet_id: wallet._id,
           created_at: Date.now(),
           notes: `Lent to ${args.name}`,
         });
-
-      } else if (args.type === "owed_by_you") {
-        // Borrowing money: Income (Add to wallet)
-        await ctx.db.patch(wallet._id, { balance: wallet.balance + args.total_amount });
-
+      } else {
+        await ctx.db.patch(wallet._id, {
+          balance: wallet.balance + args.total_amount,
+        });
         await ctx.db.insert("transactions", {
           user_id: user._id,
           amount: args.total_amount,
@@ -75,30 +82,18 @@ export const create = mutation({
       }
     }
 
-    const id = await ctx.db.insert("debts", {
+    return await ctx.db.insert("debts", {
       user_id: user._id,
       name: args.name,
       type: args.type,
       total_amount: args.total_amount,
-      remaining_amount: args.total_amount, // Start with full amount
+      remaining_amount: args.total_amount,
       interest_rate: args.interest_rate,
       due_date: args.due_date,
       notes: args.notes,
       status: "active",
       created_at: Date.now(),
       updated_at: Date.now(),
-    });
-
-    // Log Activity
-    await ctx.db.insert("activities", {
-      user_id: user._id,
-      type: "debt_create",
-      description: args.type === "owed_by_you" 
-        ? `Borrowed ₱${args.total_amount} from ${args.name}`
-        : `Lent ₱${args.total_amount} to ${args.name}`,
-      amount: args.total_amount,
-      related_id: id,
-      created_at: Date.now(),
     });
   },
 });
@@ -121,16 +116,15 @@ export const update = mutation({
     const updates: any = { updated_at: Date.now() };
     if (args.name) updates.name = args.name;
     if (args.notes) updates.notes = args.notes;
-    
-    // If total amount changes, adjust remaining amount by the same delta
+
     if (args.total_amount !== undefined) {
       const delta = args.total_amount - debt.total_amount;
       updates.total_amount = args.total_amount;
       updates.remaining_amount = Math.max(0, debt.remaining_amount + delta);
-      
-      // Update status if it becomes paid or active again
+
       if (updates.remaining_amount === 0) updates.status = "paid";
-      else if (debt.status === "paid" && updates.remaining_amount > 0) updates.status = "active";
+      else if (debt.status === "paid" && updates.remaining_amount > 0)
+        updates.status = "active";
     }
 
     await ctx.db.patch(debt._id, updates);
@@ -138,10 +132,7 @@ export const update = mutation({
 });
 
 export const remove = mutation({
-  args: {
-    userKey: v.string(),
-    debtId: v.id("debts"),
-  },
+  args: { userKey: v.string(), debtId: v.id("debts") },
   handler: async (ctx: any, args: any) => {
     const user = await getUserFromToken(ctx, args.userKey);
     if (!user) throw new Error("Unauthorized");
@@ -149,17 +140,14 @@ export const remove = mutation({
     const debt = await ctx.db.get(args.debtId);
     if (!debt || debt.user_id !== user._id) throw new Error("Debt not found");
 
-    // Clean up related payments
-    const payments = await ctx.db.query("debt_payments")
+    const payments = await ctx.db
+      .query("debt_payments")
       .withIndex("by_debt", (q: any) => q.eq("debt_id", debt._id))
       .collect();
+    for (const p of payments) await ctx.db.delete(p._id);
 
-    for (const p of payments) {
-      await ctx.db.delete(p._id);
-    }
-
-    // Unlink transactions from this debt
-    const txs = await ctx.db.query("transactions")
+    const txs = await ctx.db
+      .query("transactions")
       .withIndex("by_user", (q: any) => q.eq("user_id", user._id))
       .collect();
     for (const tx of txs) {
@@ -177,7 +165,7 @@ export const makePayment = mutation({
     userKey: v.string(),
     debtId: v.id("debts"),
     amount: v.number(),
-    walletId: v.optional(v.id("wallets")), // Optional: link to wallet deduction
+    walletId: v.optional(v.id("wallets")),
     notes: v.optional(v.string()),
   },
   handler: async (ctx: any, args: any) => {
@@ -186,10 +174,8 @@ export const makePayment = mutation({
 
     const debt = await ctx.db.get(args.debtId);
     if (!debt || debt.user_id !== user._id) throw new Error("Debt not found");
-
     if (args.amount <= 0) throw new Error("Invalid amount");
 
-    // 1. Update Debt Balance
     const newRemaining = Math.max(0, debt.remaining_amount - args.amount);
     const newStatus = newRemaining === 0 ? "paid" : "active";
 
@@ -199,34 +185,32 @@ export const makePayment = mutation({
       updated_at: Date.now(),
     });
 
-    // 2. Log in main Transaction Log (if wallet involved)
-    let txId = undefined;
+    let txId: any = undefined;
     if (args.walletId) {
       const wallet = await ctx.db.get(args.walletId);
-      if (!wallet || wallet.user_id !== user._id) throw new Error("Wallet not found");
+      if (!wallet || wallet.user_id !== user._id)
+        throw new Error("Wallet not found");
 
-      // If I owe money (owed_by_you), paying it is an EXPENSE
-      // If someone owes me (owed_to_you), receiving it is INCOME
-      const type = debt.type === "owed_by_you" ? "expense" : "income";
-      const newBalance = type === "income" ? wallet.balance + args.amount : wallet.balance - args.amount;
-
+      const isExpense = debt.type === "owed_by_you";
+      const newBalance = isExpense
+        ? wallet.balance - args.amount
+        : wallet.balance + args.amount;
       if (newBalance < 0) throw new Error(`Insufficient funds in ${wallet.name}`);
-
       await ctx.db.patch(wallet._id, { balance: newBalance });
 
       txId = await ctx.db.insert("transactions", {
         user_id: user._id,
         debt_id: debt._id,
         amount: args.amount,
-        type: "debt_payment",
-        category: "Debt Payment",
+        type: isExpense ? "debt_payment" : "income",
+        category: isExpense ? "Debt Payment" : "Debt Received",
+        bucket: isExpense ? "expense" : undefined,
         wallet_id: wallet._id,
         created_at: Date.now(),
         notes: args.notes,
       });
     }
 
-    // 3. Log in Debt Payments Table
     await ctx.db.insert("debt_payments", {
       user_id: user._id,
       debt_id: debt._id,
@@ -235,35 +219,20 @@ export const makePayment = mutation({
       transaction_id: txId,
       notes: args.notes,
     });
-
-    // 4. Log Activity
-    await ctx.db.insert("activities", {
-      user_id: user._id,
-      type: "debt_payment",
-      description: debt.type === "owed_by_you" 
-        ? `Paid ₱${args.amount} to ${debt.name}`
-        : `Received ₱${args.amount} from ${debt.name}`,
-      amount: args.amount,
-      related_id: debt._id,
-      created_at: Date.now(),
-    });
   },
 });
 
 export const getPayments = query({
-  args: {
-    userKey: v.string(),
-    debtId: v.id("debts"),
-  },
+  args: { userKey: v.string(), debtId: v.id("debts") },
   handler: async (ctx: any, args: any) => {
     const user = await getUserFromToken(ctx, args.userKey);
     if (!user) return [];
 
-    const payments = await ctx.db.query("debt_payments")
+    const payments = await ctx.db
+      .query("debt_payments")
       .withIndex("by_debt", (q: any) => q.eq("debt_id", args.debtId))
       .collect();
 
-    // Sort descending by date
     return payments.sort((a: any, b: any) => b.date - a.date);
   },
 });

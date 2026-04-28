@@ -3,85 +3,74 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  Home,
-  PieChart,
-  ArrowRightLeft,
+  LayoutDashboard,
+  ArrowLeftRight,
   Wallet,
+  PiggyBank,
+  CreditCard,
   Settings,
   LogOut,
-  Target,
-  Activity,
-  CreditCard,
-  Database,
-  List,
-  MessageSquare,
-  UserCircle,
-  CalendarDays
 } from "lucide-react";
 
 const mainMenu = [
-  { href: "/dashboard", label: "Home", icon: Home },
-  { href: "/transactions", label: "Transaction", icon: ArrowRightLeft },
-  { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/goals", label: "Goals", icon: Target },
-  { href: "/activities", label: "Activities", icon: List },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/transactions", label: "Transactions", icon: ArrowLeftRight },
+  { href: "/wallets", label: "Wallets", icon: Wallet },
+  { href: "/budget", label: "Budget", icon: PiggyBank },
   { href: "/debts", label: "Debts", icon: CreditCard },
-  { href: "/planning", label: "Plan", icon: Activity },
-  { href: "/backup", label: "Backup", icon: Database },
 ];
 
 const accountMenu = [
-  { href: "/wallets", label: "My Wallets", icon: Wallet },
-  { href: "/messages", label: "Messages", icon: MessageSquare },
-  { href: "/settings", label: "Setting", icon: Settings },
-  { href: "/about-developer", label: "About Dev", icon: UserCircle },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function Sidebar({ mobile }: { mobile?: boolean }) {
   const pathname = usePathname();
 
-  const NavItem = ({ item }: { item: any }) => {
+  const NavItem = ({ item }: { item: (typeof mainMenu)[number] }) => {
     const isActive = pathname === item.href;
     return (
       <Link
         href={item.href}
         className={cn(
-          "flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-medium transition-colors",
+          "group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all",
           isActive
-            ? "bg-black text-white"
-            : "text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+            ? "bg-gray-900 text-white shadow-sm"
+            : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
         )}
       >
-        <div className="flex items-center gap-3">
-          <item.icon className={cn("h-5 w-5", isActive ? "text-white" : "text-gray-400")} />
-          <span>{item.label}</span>
-        </div>
-        {item.badge && (
-          <span className={cn(
-            "flex h-5 w-5 items-center justify-center rounded-full text-xs",
-            isActive ? "bg-white text-black" : "bg-teal-500 text-white"
-          )}>
-            {item.badge}
-          </span>
-        )}
+        <item.icon
+          className={cn(
+            "h-[18px] w-[18px] transition-colors",
+            isActive ? "text-white" : "text-gray-400 group-hover:text-gray-700"
+          )}
+        />
+        <span>{item.label}</span>
       </Link>
     );
   };
 
   return (
-    <aside className={cn(
-      "h-screen w-64 border-r border-gray-100 bg-white p-6 flex flex-col",
-      mobile ? "w-full border-none" : "fixed left-0 top-0 hidden md:flex"
-    )}>
-      <div className="mb-10 flex items-center gap-2 px-2">
-        <div className="h-8 w-8 rounded-full bg-black"></div>
-        <span className="text-xl font-bold tracking-tight">PocketPlan</span>
+    <aside
+      className={cn(
+        "h-screen w-64 border-r border-gray-100 bg-white p-5 flex flex-col",
+        mobile ? "w-full border-none" : "fixed left-0 top-0 hidden md:flex"
+      )}
+    >
+      <div className="mb-10 flex items-center gap-2.5 px-2 pt-1">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-900">
+          <PiggyBank className="h-5 w-5 text-white" />
+        </div>
+        <div className="leading-tight">
+          <div className="text-base font-bold tracking-tight">PocketPlan</div>
+          <div className="text-[11px] text-gray-400">Personal finance</div>
+        </div>
       </div>
 
-      <div className="flex-1 space-y-8 overflow-y-auto no-scrollbar">
+      <div className="flex-1 space-y-7 overflow-y-auto no-scrollbar">
         <div>
-          <div className="mb-4 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            Main Menu
+          <div className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-400">
+            Menu
           </div>
           <nav className="space-y-1">
             {mainMenu.map((item) => (
@@ -91,8 +80,8 @@ export function Sidebar({ mobile }: { mobile?: boolean }) {
         </div>
 
         <div>
-          <div className="mb-4 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            Account Management
+          <div className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-400">
+            Account
           </div>
           <nav className="space-y-1">
             {accountMenu.map((item) => (
@@ -105,9 +94,9 @@ export function Sidebar({ mobile }: { mobile?: boolean }) {
       <div className="mt-auto pt-4 border-t border-gray-100">
         <Link
           href="/logout"
-          className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-900"
+          className="flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors"
         >
-          <LogOut className="h-5 w-5" />
+          <LogOut className="h-[18px] w-[18px]" />
           <span>Log out</span>
         </Link>
       </div>

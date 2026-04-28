@@ -2,33 +2,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { 
-  Home, 
-  PieChart, 
-  ArrowRightLeft, 
-  Target,
-  Activity,
-  Menu,
-  CreditCard,
-  Database
-} from "lucide-react";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import { VisuallyHidden } from "@/components/ui/visually-hidden";
-import { Sidebar } from "./sidebar";
+  LayoutDashboard,
+  ArrowLeftRight,
+  Wallet,
+  PiggyBank,
+  CreditCard,
+} from "lucide-react";
 
 const navItems = [
-  { href: "/dashboard", label: "Home", icon: Home },
-  { href: "/transactions", label: "Transact", icon: ArrowRightLeft },
-  { href: "/goals", label: "Goals", icon: Target },
+  { href: "/dashboard", label: "Home", icon: LayoutDashboard },
+  { href: "/transactions", label: "Activity", icon: ArrowLeftRight },
+  { href: "/budget", label: "Budget", icon: PiggyBank },
+  { href: "/wallets", label: "Wallets", icon: Wallet },
   { href: "/debts", label: "Debts", icon: CreditCard },
-  { href: "/planning", label: "Plan", icon: Activity },
-  { href: "/backup", label: "Backup", icon: Database },
 ];
 
 export function MobileBottomNav() {
@@ -36,47 +23,29 @@ export function MobileBottomNav() {
 
   return (
     <>
-      {/* Spacer to prevent content from being hidden behind the fixed nav */}
-      <div className="h-16 md:hidden" />
-      
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-gray-200 bg-white px-2 pb-safe pt-2 md:hidden">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex flex-col items-center justify-center p-2 text-xs font-medium transition-colors",
-                isActive ? "text-black" : "text-gray-500 hover:text-gray-900"
-              )}
-            >
-              <item.icon className={cn("mb-1 h-6 w-6", isActive && "fill-current")} />
-              <span className="text-[10px]">{item.label}</span>
-            </Link>
-          );
-        })}
-        
-        {/* Mobile Menu Trigger for less common items */}
-        <Sheet>
-          <SheetTrigger asChild>
-            <button className="flex flex-col items-center justify-center p-2 text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors">
-              <Menu className="mb-1 h-6 w-6" />
-              <span className="text-[10px]">Menu</span>
-            </button>
-          </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-[300px]">
-            <VisuallyHidden>
-              <SheetHeader>
-                <SheetTitle>Navigation Menu</SheetTitle>
-              </SheetHeader>
-            </VisuallyHidden>
-            {/* Reusing the existing Sidebar content inside the sheet */}
-            <div className="h-full overflow-y-auto">
-               <Sidebar mobile />
-            </div>
-          </SheetContent>
-        </Sheet>
+      <div className="h-20 md:hidden" />
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-100 bg-white/90 backdrop-blur-md pb-safe md:hidden">
+        <div className="flex items-stretch justify-around px-1 pt-1.5 pb-1.5">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "relative flex flex-1 flex-col items-center justify-center gap-1 rounded-xl py-2 transition-colors",
+                  isActive ? "text-gray-900" : "text-gray-400 hover:text-gray-700"
+                )}
+              >
+                {isActive && (
+                  <span className="absolute -top-px left-1/2 h-1 w-8 -translate-x-1/2 rounded-full bg-gray-900" />
+                )}
+                <item.icon className={cn("h-[22px] w-[22px]", isActive && "stroke-[2.25]")} />
+                <span className="text-[10px] font-medium tracking-tight">{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
       </nav>
     </>
   );

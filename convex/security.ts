@@ -1,6 +1,5 @@
-import { mutationGeneric as mutation, queryGeneric as query, internalMutationGeneric as internalMutation } from "convex/server";
+import { mutationGeneric as mutation } from "convex/server";
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
 
 // Constants
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute

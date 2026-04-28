@@ -8,19 +8,12 @@
  * @module
  */
 
-import type * as activities from "../activities.js";
 import type * as admin from "../admin.js";
 import type * as analytics from "../analytics.js";
 import type * as auth from "../auth.js";
-import type * as backup from "../backup.js";
-import type * as backup_data from "../backup_data.js";
-import type * as crons from "../crons.js";
+import type * as budgets from "../budgets.js";
 import type * as debts from "../debts.js";
-import type * as goals from "../goals.js";
-import type * as messages from "../messages.js";
-import type * as plans from "../plans.js";
 import type * as security from "../security.js";
-import type * as traffic from "../traffic.js";
 import type * as transactions from "../transactions.js";
 import type * as users from "../users.js";
 import type * as wallets from "../wallets.js";
@@ -32,19 +25,12 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  activities: typeof activities;
   admin: typeof admin;
   analytics: typeof analytics;
   auth: typeof auth;
-  backup: typeof backup;
-  backup_data: typeof backup_data;
-  crons: typeof crons;
+  budgets: typeof budgets;
   debts: typeof debts;
-  goals: typeof goals;
-  messages: typeof messages;
-  plans: typeof plans;
   security: typeof security;
-  traffic: typeof traffic;
   transactions: typeof transactions;
   users: typeof users;
   wallets: typeof wallets;

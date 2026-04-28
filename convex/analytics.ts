@@ -2,321 +2,202 @@ import { queryGeneric as query } from "convex/server";
 import { v } from "convex/values";
 import { getUserFromToken } from "./auth";
 
-export const walletHistory = query({
-  args: { 
-    userKey: v.string(), 
-    period: v.union(v.literal("daily"), v.literal("weekly"), v.literal("monthly")),
-    walletId: v.optional(v.string())
-  },
-  handler: async (ctx: any, args: any) => {
-    const user = await getUserFromToken(ctx, args.userKey);
-    if (!user) return [];
+function startOfDay(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+function endOfDay(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).getTime();
+}
 
-    const wallets = await ctx.db.query("wallets")
-      .withIndex("by_user", (q: any) => q.eq("user_id", user._id))
-      .collect();
-
-    let txs = await ctx.db.query("transactions")
-      .withIndex("by_user", (q: any) => q.eq("user_id", user._id))
-      .collect();
-    
-    // Sort transactions by date ascending
-    txs.sort((a: any, b: any) => a.created_at - b.created_at);
-
-    // Filter by specific wallet if requested
-    if (args.walletId && args.walletId !== "all") {
-      const wId = args.walletId;
-      txs = txs.filter((t: any) => 
-        t.wallet_id === wId || 
-        t.transfer_from_wallet_id === wId || 
-        t.transfer_to_wallet_id === wId
-      );
-    }
-
-    // Determine date range and grouping
-    const now = new Date();
-    let startDate = new Date();
-    
-    if (args.period === "daily") startDate.setDate(now.getDate() - 30); // Last 30 days
-    if (args.period === "weekly") startDate.setDate(now.getDate() - 90); // Last 3 months
-    if (args.period === "monthly") startDate.setFullYear(now.getFullYear() - 1); // Last 1 year
-    
-    const startTime = startDate.getTime();
-
-    // Calculate initial balances before the start date
-    // We start with current balance and work backwards, OR start with 0 and replay everything
-    // Replaying everything is safer for accuracy
-    
-    // Map to track balance of each wallet
-    const walletBalances: Record<string, number> = {};
-    wallets.forEach((w: any) => walletBalances[w._id] = 0); // Start at 0? No, we need initial state.
-    
-    // BETTER APPROACH:
-    // 1. Get current balances of all wallets.
-    // 2. We need to "un-apply" transactions that happened AFTER our data points to find historical balances?
-    //    OR rely on the fact we have all history?
-    //    Let's assume we have full history in `txs`.
-    //    If we re-play from start of time, we get accurate history.
-    
-    const timePoints: Record<string, any> = {};
-
-    // Helper to format date key
-    const formatKey = (date: Date) => {
-      if (args.period === "daily") return date.toISOString().split('T')[0]; // YYYY-MM-DD
-      if (args.period === "weekly") {
-        const d = new Date(date);
-        const day = d.getDay();
-        const diff = d.getDate() - day + (day == 0 ? -6 : 1); // adjust when day is sunday
-        const monday = new Date(d.setDate(diff));
-        return monday.toISOString().split('T')[0];
-      }
-      if (args.period === "monthly") return date.toISOString().slice(0, 7); // YYYY-MM
-      return "";
-    };
-
-    // Replay history
-    txs.forEach((t: any) => {
-      // Apply transaction logic to wallet balances
-      // Logic mirrors the `log` mutation but purely for calculation here
-      if (t.type === "income") {
-        if (walletBalances[t.wallet_id] !== undefined) walletBalances[t.wallet_id] += t.amount;
-      } else if (t.type === "expense") {
-        if (walletBalances[t.wallet_id] !== undefined) walletBalances[t.wallet_id] -= t.amount;
-      } else if (t.type === "transfer") {
-        if (walletBalances[t.transfer_from_wallet_id] !== undefined) walletBalances[t.transfer_from_wallet_id] -= t.amount;
-        if (walletBalances[t.transfer_to_wallet_id] !== undefined) walletBalances[t.transfer_to_wallet_id] += t.amount;
-      } else if (t.type === "savings") {
-         // Savings usually moves money out of a "spending" wallet into a "goal" (conceptually)
-         // or just stays in the wallet but is tagged.
-         // If it has a wallet_id, we treat it like an expense/allocation? 
-         // Existing logic in `log` for savings treats it like an expense (deducts from wallet).
-         if (walletBalances[t.wallet_id] !== undefined) walletBalances[t.wallet_id] -= t.amount;
-      }
-
-      // Record snapshot if within requested time range
-      if (t.created_at >= startTime) {
-        const key = formatKey(new Date(t.created_at));
-        
-        // Clone current state
-        const total = Object.values(walletBalances).reduce((a, b) => a + b, 0);
-        
-        // If filtering by specific wallet, return just that one, else total
-        let value = total;
-        if (args.walletId && args.walletId !== "all") {
-           value = walletBalances[args.walletId] || 0;
-        }
-
-        // We only want the LAST balance of the period, so we overwrite
-        timePoints[key] = { date: key, balance: value };
-      }
-    });
-
-    // Fill in gaps? Charts handle gaps okay usually, but better to fill forward.
-    // For now, return collected points.
-    return Object.values(timePoints);
-  }
-});
-
+// Single dashboard query: balances, this-month income/expense, today's expense,
+// per-bucket budget progress, top categories, recent transactions, debts.
 export const dashboard = query({
   args: { userKey: v.string() },
   handler: async (ctx: any, args: any) => {
-    const user = await getUserFromToken(ctx, args.userKey);
-    if (!user) return {
+    const empty = {
+      hasUser: false,
       totalBalance: 0,
       monthIncome: 0,
       monthExpense: 0,
-      monthNet: 0,
-      expensePerDay: 0,
-      trends: { balance: 0, income: 0, expense: 0, net: 0, expensePerDay: 0 },
-      wallets: [],
-      goalProgress: [],
-      spendingByCategory: [],
-      spendingHistory: [],
-      warnings: { overspending: false, goalAchieved: false, aheadOfSchedule: false, behindSchedule: false }
+      todayExpense: 0,
+      yearMonth: "",
+      hasBudget: false,
+      budgetIncome: 0,
+      buckets: [] as any[],
+      topCategories: [] as any[],
+      recentTransactions: [] as any[],
+      outstandingDebt: 0,
+      receivableDebt: 0,
+      wallets: [] as any[],
     };
 
-    const wallets = await ctx.db.query("wallets").withIndex("by_user", (q: any) => q.eq("user_id", user._id)).collect();
-    const txs = await ctx.db.query("transactions").withIndex("by_user", (q: any) => q.eq("user_id", user._id)).collect();
-    const goals = await ctx.db.query("goals").withIndex("by_user", (q: any) => q.eq("user_id", user._id)).collect();
-    
-    const totalBalance = wallets.reduce((a: number, w: any) => a + w.balance, 0);
+    const user = await getUserFromToken(ctx, args.userKey);
+    if (!user) return empty;
 
     const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const startCurrent = new Date(currentYear, currentMonth, 1).getTime();
-    const endCurrent = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59, 999).getTime();
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const startMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const endMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999
+    ).getTime();
+    const todayStart = startOfDay(now);
+    const todayEnd = endOfDay(now);
 
-    // Previous month calculation
-    const prevMonthDate = new Date(currentYear, currentMonth - 1, 1);
-    const prevMonth = prevMonthDate.getMonth();
-    const prevYear = prevMonthDate.getFullYear();
-    const startPrev = new Date(prevYear, prevMonth, 1).getTime();
-    const endPrev = new Date(prevYear, prevMonth + 1, 0, 23, 59, 59, 999).getTime();
+    const [wallets, txs, debts, budget] = await Promise.all([
+      ctx.db
+        .query("wallets")
+        .withIndex("by_user", (q: any) => q.eq("user_id", user._id))
+        .collect(),
+      ctx.db
+        .query("transactions")
+        .withIndex("by_user_created", (q: any) => q.eq("user_id", user._id))
+        .collect(),
+      ctx.db
+        .query("debts")
+        .withIndex("by_user", (q: any) => q.eq("user_id", user._id))
+        .collect(),
+      ctx.db
+        .query("monthly_budgets")
+        .withIndex("by_user_month", (q: any) =>
+          q.eq("user_id", user._id).eq("year_month", ym)
+        )
+        .unique(),
+    ]);
 
-    const currentRange = txs.filter((t: any) => t.created_at >= startCurrent && t.created_at <= endCurrent);
-    const prevRange = txs.filter((t: any) => t.created_at >= startPrev && t.created_at <= endPrev);
+    const totalBalance = wallets.reduce((a: number, w: any) => a + w.balance, 0);
 
-    const income = currentRange.filter((t: any) => t.type === "income").reduce((a: number, b: any) => a + b.amount, 0);
-    const expense = currentRange.filter((t: any) => t.type === "expense" || t.type === "savings" || t.type === "debt_payment").reduce((a: number, b: any) => a + b.amount, 0);
-    const transferVolume = currentRange.filter((t: any) => t.type === "transfer").reduce((a: number, b: any) => a + b.amount, 0);
-    const net = income - expense;
+    const monthTxs = txs.filter(
+      (t: any) => t.created_at >= startMonth && t.created_at <= endMonth
+    );
 
-    // Today's total expenses
-    const todayStart = new Date(currentYear, currentMonth, now.getDate()).getTime();
-    const todayEnd = new Date(currentYear, currentMonth, now.getDate(), 23, 59, 59, 999).getTime();
-    const expensePerDay = currentRange
-      .filter((t: any) => t.created_at >= todayStart && t.created_at <= todayEnd && (t.type === "expense" || t.type === "savings" || t.type === "debt_payment"))
-      .reduce((a: number, b: any) => a + b.amount, 0);
+    const monthIncome = monthTxs
+      .filter((t: any) => t.type === "income")
+      .reduce((a: number, t: any) => a + t.amount, 0);
 
-    // Yesterday's total expenses (for trend comparison)
-    const yesterdayDate = new Date(currentYear, currentMonth, now.getDate() - 1);
-    const yesterdayStart = new Date(yesterdayDate.getFullYear(), yesterdayDate.getMonth(), yesterdayDate.getDate()).getTime();
-    const yesterdayEnd = new Date(yesterdayDate.getFullYear(), yesterdayDate.getMonth(), yesterdayDate.getDate(), 23, 59, 59, 999).getTime();
-    const allTxs = [...currentRange, ...prevRange];
-    const prevExpensePerDay = allTxs
-      .filter((t: any) => t.created_at >= yesterdayStart && t.created_at <= yesterdayEnd && (t.type === "expense" || t.type === "savings" || t.type === "debt_payment"))
-      .reduce((a: number, b: any) => a + b.amount, 0);
-    const prevIncome = prevRange.filter((t: any) => t.type === "income").reduce((a: number, b: any) => a + b.amount, 0);
-    const prevExpense = prevRange.filter((t: any) => t.type === "expense" || t.type === "savings" || t.type === "debt_payment").reduce((a: number, b: any) => a + b.amount, 0);
-    const prevNet = prevIncome - prevExpense;
+    const monthExpense = monthTxs
+      .filter((t: any) => t.type === "expense" || t.type === "debt_payment")
+      .reduce((a: number, t: any) => a + t.amount, 0);
 
-    // Spending by Category (Current Month)
-    const categoryMap: Record<string, number> = {};
-    currentRange.filter((t: any) => t.type === "expense").forEach((t: any) => {
-      const cat = t.category || "Uncategorized";
-      categoryMap[cat] = (categoryMap[cat] || 0) + t.amount;
-    });
-    const spendingByCategory = Object.entries(categoryMap)
-      .map(([label, amount]) => ({ label, amount }))
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 5); // Top 5 categories
+    const todayExpense = monthTxs
+      .filter(
+        (t: any) =>
+          t.created_at >= todayStart &&
+          t.created_at <= todayEnd &&
+          (t.type === "expense" || t.type === "debt_payment")
+      )
+      .reduce((a: number, t: any) => a + t.amount, 0);
 
-    // Weekly History (Sunday to Saturday)
-    const today = new Date();
-    const dayOfWeek = today.getDay(); // 0 (Sun) - 6 (Sat)
-    const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() - dayOfWeek);
-    startOfWeek.setHours(0, 0, 0, 0);
-    const startOfWeekTime = startOfWeek.getTime();
-    
-    // Initialize with 0s for Sun-Sat
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const spendingMap = days.map(day => ({ day, amount: 0 }));
-    const incomeMap = days.map(day => ({ day, amount: 0 }));
-    const transferMap = days.map(day => ({ day, amount: 0 }));
-
-    txs.forEach((t: any) => {
-      if (t.created_at >= startOfWeekTime) {
-        const d = new Date(t.created_at);
-        const dayIndex = d.getDay();
-        
-        if (t.type === "expense") {
-          spendingMap[dayIndex].amount += t.amount;
-        } else if (t.type === "income") {
-          incomeMap[dayIndex].amount += t.amount;
-        } else if (t.type === "transfer") {
-          transferMap[dayIndex].amount += t.amount;
-        }
-      }
-    });
-
-    const spendingHistory = spendingMap;
-    const incomeHistory = incomeMap;
-    const transferHistory = transferMap;
-
-    // Helper to calculate percentage change safely
-    const calcTrend = (current: number, previous: number) => {
-      if (previous === 0) return current > 0 ? 100 : 0;
-      return ((current - previous) / previous) * 100;
+    const spentByBucket: Record<string, number> = {
+      expense: 0,
+      savings: 0,
+      others: 0,
     };
-    
-    const trends = {
-      income: calcTrend(income, prevIncome),
-      expense: calcTrend(expense, prevExpense),
-      net: calcTrend(net, prevNet),
-      balance: calcTrend(totalBalance, totalBalance - net) 
-    };
+    const spentByCategoryName: Record<string, number> = {};
 
-    let goalProgress: Array<{ slug: string; progress: number; remaining: number; saved: number }> = [];
-    for (const g of goals as any[]) {
-      // Calculate savings specifically for this goal
-      // Look for transactions that have this goal_id (direct contribution)
-      // OR look for transfers to a "Goal Wallet" if we had that concept, but for now relying on goal_id linkage
-      
-      const goalTransactions = txs.filter((t: any) => t.goal_id === g._id);
-      
-      const saved = goalTransactions.reduce((acc: number, t: any) => {
-         // Income/Transfer IN/Savings adds to goal
-         if (t.type === 'income' || t.type === 'savings' || (t.type === 'transfer' && t.transfer_to_wallet_id)) return acc + t.amount;
-         // Expense/Transfer OUT subtracts (if users withdraw from goal)
-         if (t.type === 'expense' || (t.type === 'transfer' && t.transfer_from_wallet_id)) return acc - t.amount;
-         return acc;
-      }, 0);
-
-      // Ensure saved amount isn't negative for display purposes
-      const net_saved = Math.max(0, saved);
-      
-      const progress = Math.min(100, (net_saved / g.target_amount) * 100);
-      const remaining = Math.max(0, g.target_amount - net_saved);
-      goalProgress.push({ slug: g.slug, progress, remaining, saved: net_saved });
+    for (const t of monthTxs) {
+      if (t.type === "income" || t.type === "transfer") continue;
+      const b = t.bucket ?? "expense";
+      spentByBucket[b] = (spentByBucket[b] ?? 0) + t.amount;
+      const key = t.category || "Uncategorized";
+      spentByCategoryName[key] = (spentByCategoryName[key] ?? 0) + t.amount;
     }
-    
-    const weekStart = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const week = txs.filter((t: any) => t.created_at >= weekStart && t.created_at <= Date.now());
-    const weekIncome = week.filter((t: any) => t.type === "income").reduce((a: number, b: any) => a + b.amount, 0);
-    const weekExpense = week.filter((t: any) => t.type === "expense").reduce((a: number, b: any) => a + b.amount, 0);
-    
-    const goalAchieved = (goals as any[]).some((g: any) => {
-      const total_income = txs.filter((t: any) => t.type === "income").reduce((a: number, b: any) => a + b.amount, 0);
-      const total_expense = txs.filter((t: any) => t.type === "expense").reduce((a: number, b: any) => a + b.amount, 0);
-      const net_savings = total_income - total_expense;
-      return net_savings >= g.target_amount;
-    });
-    const aheadOfSchedule = (goals as any[]).some((g: any) => {
-      const start = g.start_date ?? g.created_at;
-      const daysSoFar = Math.max(1, Math.ceil((Date.now() - start) / (1000 * 60 * 60 * 24)));
-      const total_income = txs.filter((t: any) => t.type === "income").reduce((a: number, b: any) => a + b.amount, 0);
-      const total_expense = txs.filter((t: any) => t.type === "expense").reduce((a: number, b: any) => a + b.amount, 0);
-      const net_savings = total_income - total_expense;
-      const avgPerDay = net_savings / daysSoFar;
-      return avgPerDay >= g.required_daily_savings * 1.1;
-    });
-    const behindSchedule = (goals as any[]).some((g: any) => {
-      const start = g.start_date ?? g.created_at;
-      const daysSoFar = Math.max(1, Math.ceil((Date.now() - start) / (1000 * 60 * 60 * 24)));
-      const total_income = txs.filter((t: any) => t.type === "income").reduce((a: number, b: any) => a + b.amount, 0);
-      const total_expense = txs.filter((t: any) => t.type === "expense").reduce((a: number, b: any) => a + b.amount, 0);
-      const net_savings = total_income - total_expense;
-      const avgPerDay = net_savings / daysSoFar;
-      return avgPerDay < g.required_daily_savings * 0.9;
-    });
-    
-    const warnings = {
-      overspending: expense > income || weekExpense > weekIncome,
-      goalAchieved,
-      aheadOfSchedule,
-      behindSchedule,
-    };
+
+    const bucketBudgets = budget
+      ? {
+          expense: (budget.income * budget.expense_pct) / 100,
+          savings: (budget.income * budget.savings_pct) / 100,
+          others: (budget.income * budget.others_pct) / 100,
+        }
+      : { expense: 0, savings: 0, others: 0 };
+
+    const buckets = (["expense", "savings", "others"] as const).map((key) => ({
+      key,
+      budget: bucketBudgets[key],
+      spent: spentByBucket[key] ?? 0,
+      pct:
+        bucketBudgets[key] > 0
+          ? Math.min(100, (spentByBucket[key] / bucketBudgets[key]) * 100)
+          : 0,
+    }));
+
+    const topCategories = Object.entries(spentByCategoryName)
+      .map(([name, amount]) => ({ name, amount }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5);
+
+    const recentTransactions = [...txs]
+      .sort((a: any, b: any) => b.created_at - a.created_at)
+      .slice(0, 8);
+
+    const outstandingDebt = debts
+      .filter((d: any) => d.type === "owed_by_you" && d.status === "active")
+      .reduce((a: number, d: any) => a + d.remaining_amount, 0);
+    const receivableDebt = debts
+      .filter((d: any) => d.type === "owed_to_you" && d.status === "active")
+      .reduce((a: number, d: any) => a + d.remaining_amount, 0);
 
     return {
+      hasUser: true,
       totalBalance,
-      monthIncome: income,
-      monthExpense: expense,
-      monthTransferVolume: transferVolume,
-      monthNet: net,
-      expensePerDay,
-      trends: {
-        ...trends,
-        expensePerDay: calcTrend(expensePerDay, prevExpensePerDay),
-      },
+      monthIncome,
+      monthExpense,
+      todayExpense,
+      yearMonth: ym,
+      hasBudget: !!budget,
+      budgetIncome: budget?.income ?? 0,
+      buckets,
+      topCategories,
+      recentTransactions,
+      outstandingDebt,
+      receivableDebt,
       wallets,
-      goalProgress,
-      spendingByCategory,
-      spendingHistory,
-      incomeHistory,
-      transferHistory,
-      warnings
     };
+  },
+});
+
+// Day-by-day summary used by the calendar view: keyed by "YYYY-MM-DD".
+export const monthCalendar = query({
+  args: { userKey: v.string(), yearMonth: v.optional(v.string()) },
+  handler: async (ctx: any, args: any) => {
+    const user = await getUserFromToken(ctx, args.userKey);
+    if (!user) return { yearMonth: args.yearMonth ?? "", days: {} };
+
+    const ym =
+      args.yearMonth ??
+      (() => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      })();
+    const [y, m] = ym.split("-").map(Number);
+    const start = new Date(y, m - 1, 1).getTime();
+    const end = new Date(y, m, 0, 23, 59, 59, 999).getTime();
+
+    const txs = await ctx.db
+      .query("transactions")
+      .withIndex("by_user_created", (q: any) => q.eq("user_id", user._id))
+      .collect();
+
+    const days: Record<
+      string,
+      { income: number; expense: number; transfer: number; count: number }
+    > = {};
+    for (const t of txs) {
+      if (t.created_at < start || t.created_at > end) continue;
+      const d = new Date(t.created_at);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      if (!days[key]) days[key] = { income: 0, expense: 0, transfer: 0, count: 0 };
+      days[key].count += 1;
+      if (t.type === "income") days[key].income += t.amount;
+      else if (t.type === "transfer") days[key].transfer += t.amount;
+      else days[key].expense += t.amount; // expense + debt_payment
+    }
+
+    return { yearMonth: ym, days };
   },
 });
