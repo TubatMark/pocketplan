@@ -121,11 +121,9 @@ export async function getUserFromToken(ctx: any, token: string) {
 
   if (!session) return null;
 
-  // Delete expired sessions on access
-  if (session.expiresAt < Date.now()) {
-    await ctx.db.delete(session._id);
-    return null;
-  }
+  // Treat expired sessions as invalid. Cleanup happens in mutations
+  // (e.g. signOut) since queries cannot write to the database.
+  if (session.expiresAt < Date.now()) return null;
 
   return await ctx.db.get(session.userId);
 }
